@@ -75,9 +75,12 @@ Binary를 쓰는 순간 SLAM 여부와 무관하게 라이선스가 걸리기 �
 - §1.1: 설치·실행·**배포 가능하나 "원형 그대로(unmodified)"만.**
 - §1.2(i)(ii): 리버스 엔지니어링·디컴파일·수정·파생물 생성 금지.
   → 우리도 `xr.js` 내부를 디컴파일해 API를 캐지 않는다. **문서화된 공개 API만 사용.**
-- §3 귀속표시(Attribution): Niantic Spatial 식별 + 저작권 고지 + 본 Agreement 참조 +
-  무보증 고지 유지. zip의 `resources/powered-by.svg`가 귀속 마크. → **앱에 "Powered
-  by 8th Wall" 표기 및 라이선스 고지 필수.**
+- §1.3 귀속표시(Attribution): Niantic Spatial 식별 + 저작권 고지 + 본 Agreement 참조
+  (텍스트 또는 URI/하이퍼링크 포함) + 무보증 고지 유지. zip의 `resources/powered-by.svg`가
+  귀속 마크. → **앱에 "Powered by 8th Wall" 표기 및 라이선스 고지 필수.**
+- §3 Confidential Information: Software를 기밀정보로 규정하나, §3(a) "공중에 일반적으로
+  알려졌거나 이용 가능한 정보"는 제외 — 이 바이너리는 jsdelivr/npm으로 공개 배포되므로
+  바이너리 자체의 기밀성은 대체로 무의미. 다만 조항 존재는 기록해 둔다.
 - §4 AS-IS 무보증, §7.2 5일 통지로 해지 가능, §4(vi) Niantic이 개발 중단 가능.
   → 계획서 §7의 "유지보수 중단 → SLAM 파손 가능" 리스크가 라이선스로도 확인됨.
 
