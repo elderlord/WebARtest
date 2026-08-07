@@ -70,6 +70,8 @@ export function createShaderSmokeTest({ onResult } = {}) {
   let quad = null
   let reported = false
   let frames = 0
+  let glCtx = null
+  let camTex = null
   let uCamera, uTime, uRect, aPos
 
   const report = (pass, note) => {
@@ -82,7 +84,7 @@ export function createShaderSmokeTest({ onResult } = {}) {
   return {
     name: '0a-shader-smoke',
     onStart: ({ canvas, GLctx }) => {
-      const gl = GLctx || canvas.getContext('webgl')
+      const gl = (glCtx = GLctx || canvas.getContext('webgl'))
       if (!gl) return report(false, 'WebGL 컨텍스트 없음')
       program = buildProgram(gl, VERT, FRAG)
       if (!program) return report(false, '셰이더 컴파일 실패')
@@ -94,21 +96,20 @@ export function createShaderSmokeTest({ onResult } = {}) {
       gl.bindBuffer(gl.ARRAY_BUFFER, quad)
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW)
     },
-    // 카메라 프레임마다: 카메라 텍스처를 셰이더로 변조 시도
-    onProcessGpu: ({ processGpuResult }) => {
-      // 텍스처 핸들 확인이 0-A의 핵심 판정.
-      // 파이프라인이 안정될 시간을 주고(초기 몇 프레임은 비어 있을 수 있음),
-      // 그래도 못 찾으면 실제 키 모양을 함께 보고해 다음 라운드에서 정확히 짚는다.
-      const tex = getCameraTexture(processGpuResult)
+    // processGpuResult는 onProcessGpu(결과를 "생산"하는 단계)가 아니라
+    // onUpdate에서 전달된다(0-A 실측 확인). 여기서 텍스처 핸들을 잡아 둔다.
+    onUpdate: ({ processGpuResult }) => {
       frames++
-      if (tex == null && frames > 30) {
+      const tex = getCameraTexture(processGpuResult)
+      if (tex) {
+        camTex = tex
+      } else if (frames > 30) {
         report(false, `카메라 텍스처 핸들 미확인 · ${describeShape(processGpuResult)}`)
       }
-      return { smokeTexture: tex }
     },
-    onRender: ({ GLctx, processGpuResult, framework }) => {
-      const gl = GLctx
-      const tex = getCameraTexture(processGpuResult)
+    onRender: () => {
+      const gl = glCtx
+      const tex = camTex
       if (!gl || !program || !tex) return
       gl.useProgram(program)
       gl.bindBuffer(gl.ARRAY_BUFFER, quad)
@@ -117,7 +118,7 @@ export function createShaderSmokeTest({ onResult } = {}) {
       gl.activeTexture(gl.TEXTURE0)
       gl.bindTexture(gl.TEXTURE_2D, tex)
       gl.uniform1i(uCamera, 0)
-      gl.uniform1f(uTime, (framework?.time || performance.now()) / 1000)
+      gl.uniform1f(uTime, performance.now() / 1000)
       gl.uniform4f(uRect, 0.35, 0.4, 0.3, 0.2) // 화면 중앙 사각 영역
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
       report(true, '카메라 텍스처를 커스텀 셰이더로 샘플·변조 성공 → shimmer 경로 유효')
