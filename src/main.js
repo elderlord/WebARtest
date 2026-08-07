@@ -12,8 +12,11 @@ import { showAttribution } from './ar/attribution.js'
 //   (2) 런타임은 로드됐으나 startXr8()이 실패 → 실제 에러를 화면에 표시(0-A 진단)
 // 이전엔 하나의 catch가 둘을 뭉뚱그려 (2)가 DEV 모드로 위장됐다.
 
-// main.js가 실행되면 부팅 진단 문구 제거 (index.html의 #boot)
+// main.js가 실행되면 부팅 진단 문구 제거 + 자가복구 플래그 리셋 (index.html의 #boot)
 document.getElementById('boot')?.remove()
+try {
+  sessionStorage.removeItem('_reloadOnce')
+} catch {}
 
 // 0-A 디버깅: 삼켜지는 에러가 없도록 전역 에러를 화면에 노출한다.
 let errShown = false

@@ -21,6 +21,16 @@
       로딩 중… 몇 초 뒤에도 이 문구만 보이면 스크립트/자산 로드 실패입니다.
     </div>
 
+    <!-- 자가복구: 캐시/전파 지연으로 번들이 안 뜨면 1회 자동 새로고침(무한루프 가드). -->
+    <script>
+      setTimeout(function () {
+        if (document.getElementById('boot') && !sessionStorage.getItem('_reloadOnce')) {
+          sessionStorage.setItem('_reloadOnce', '1')
+          location.reload()
+        }
+      }, 5000)
+    </script>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
