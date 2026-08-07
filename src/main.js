@@ -18,6 +18,18 @@ try {
   sessionStorage.removeItem('_reloadOnce')
 } catch {}
 
+// 빌드 식별자를 화면 좌하단에 찍는다 → 새 빌드/캐시 구분용 (vite define)
+const BUILD_ID = typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev'
+{
+  const s = document.createElement('div')
+  s.textContent = `build ${BUILD_ID}`
+  s.style.cssText =
+    'position:fixed;left:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);z-index:12;' +
+    'font:10px -apple-system,sans-serif;color:#9ca3af;background:rgba(17,24,39,.7);' +
+    'padding:2px 6px;border-radius:5px'
+  document.body.appendChild(s)
+}
+
 // 0-A 디버깅: 삼켜지는 에러가 없도록 전역 에러를 화면에 노출한다.
 let errShown = false
 const surfaceError = (label, msg) => {
