@@ -3,6 +3,7 @@ import { createAlignmentBox } from './alignmentBox.js'
 import { Metrics, FpsMeter } from './metrics.js'
 import { createShaderSmokeTest } from './shaderSmokeTest.js'
 import { showBanner } from '../hud.js'
+import { RUNTIME } from './runtime.js'
 
 // 8th Wall XR8 카메라 파이프라인 위에 three.js 씬을 얹고,
 // 이미지 타겟 인식 시 정합 박스를 타겟에 부착한다. (0단계 계측 하네스)
@@ -102,7 +103,7 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false } = {}) {
   const modules = [
     XR8.GlTextureRenderer.pipelineModule(), // 카메라 피드를 캔버스에 렌더
     XR8.Threejs.pipelineModule(), // three.js 씬 관리
-    XR8.XrController.pipelineModule(), // 이미지 타겟 추적 (SLAM은 조건부: runtime.ensureSlam)
+    XR8.XrController.pipelineModule(), // 트래킹 (SLAM은 조건부: runtime.enableWorldTracking)
   ]
 
   // 이미지 타겟은 실제 컴파일 타겟이 있을 때만 등록한다.
@@ -121,6 +122,10 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false } = {}) {
   }
 
   XR8.addCameraPipelineModules(modules)
+
+  // 0-B는 이미지 타겟 단독(disableWorldTracking: true). SLAM은 0-B2에서
+  // runtime.enableWorldTracking()으로만 켠다.
+  XR8.XrController.configure({ disableWorldTracking: RUNTIME.disableWorldTracking })
 
   if (hasRealTarget) {
     XR8.XrController.configure({ imageTargets: [IMAGE_TARGET_NAME] })

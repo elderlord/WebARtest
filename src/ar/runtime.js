@@ -21,9 +21,15 @@ export const RUNTIME = {
   //   - slam/face chunk도 같은 CDN 베이스에서 지연 로드됨
   // self-host로 바꾸려면 '/xr8/xr.js'로 교체(public/xr8/에 벤더링, git 제외).
   url: 'https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js',
-  // SLAM은 조건부(0-B2): 기본은 preload 안 함. 필요 판정 시 ensureSlam()로 지연 로드.
-  preloadChunks: [],
-  hasSlamChunk: true, // 바이너리에 xr-slam.js 포함 → ensureSlam() 사용 가능
+  // 0-A 실측(2026-08-07)으로 확인: core xr.js에는 run/loadChunk/version/featureFlags/
+  // CanvasScreenshot/MediaRecorder만 있고, **XrController(트래킹)는 chunk에 있다.**
+  // 따라서 이미지 타겟만 쓰더라도 tracking chunk 로드가 필수다.
+  requiredChunks: ['slam'],
+  hasSlamChunk: true, // 바이너리에 xr-slam.js 포함
+  // 월드 트래킹(SLAM) 사용 여부는 chunk 로드가 아니라 XrController.configure로 토글한다.
+  //   true  = 이미지 타겟 단독 (0-B)
+  //   false = 월드 트래킹(SLAM) 활성 (0-B2, 필요 판정 시)
+  disableWorldTracking: true,
   // §1.3: 바이너리 사용 시 귀속표시 필수. 경로 B(MIT)에서는 false로.
   requiresAttribution: true,
   crossorigin: 'anonymous',
@@ -32,7 +38,21 @@ export const RUNTIME = {
 // 런타임 스크립트를 주입하고 window.XR8이 준비되면 resolve한다.
 // 런타임이 없거나 시간 초과면 reject → 호출부가 DEV 모드로 폴백.
 export function loadRuntime(cfg = RUNTIME, timeoutMs = 6000) {
-  return injectScript(cfg).then(() => waitForXR8(timeoutMs))
+  return injectScript(cfg)
+    .then(() => waitForXR8(timeoutMs))
+    .then(() => ensureChunks(cfg))
+}
+
+// 필수 chunk를 로드한다. XrController 등 트래킹 모듈이 여기 들어있다.
+export async function ensureChunks(cfg = RUNTIME) {
+  const chunks = cfg.requiredChunks || []
+  for (const c of chunks) {
+    if (typeof window.XR8.loadChunk !== 'function') {
+      throw new Error('XR8.loadChunk 없음 — 런타임 빌드 확인 필요')
+    }
+    await window.XR8.loadChunk(c)
+  }
+  return window.XR8
 }
 
 function injectScript(cfg) {
@@ -72,13 +92,15 @@ function waitForXR8(timeoutMs) {
   })
 }
 
-// 0-B2 조건부 SLAM: 0-B에서 Pose 변동이 과하다고 판정될 때만 호출한다.
+// 0-B2 조건부 SLAM: 0-B에서 Pose 변동이 과하다고 판정될 때만 켠다.
+// chunk는 이미 로드되어 있으므로(트래킹 모듈이 거기 있음), 여기서는 월드 트래킹만 켠다.
 // 경로 B(hasSlamChunk=false)에서는 no-op이며 false를 반환한다.
-export async function ensureSlam(cfg = RUNTIME) {
+export function enableWorldTracking(cfg = RUNTIME) {
   if (!cfg.hasSlamChunk) {
-    console.warn('[runtime] 현재 경로에 SLAM chunk 없음 (경로 B). 이미지 타겟 단독으로 동작.')
+    console.warn('[runtime] 현재 경로에 SLAM 없음 (경로 B). 이미지 타겟 단독으로 동작.')
     return false
   }
-  await window.XR8.loadChunk('slam')
+  cfg.disableWorldTracking = false
+  window.XR8.XrController.configure({ disableWorldTracking: false })
   return true
 }
