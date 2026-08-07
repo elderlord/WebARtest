@@ -41,21 +41,35 @@ const VERT = `
   }
 `
 
-// 벤더링된 런타임에서 카메라 피드 텍스처 핸들을 얻는 지점. (0-A 확인 대상)
-// 8th Wall camera pipeline은 onProcessGpu 결과 / GlTextureRenderer를 통해 카메라
-// 텍스처를 노출한다. 실기기에서 이 함수가 유효한 WebGLTexture를 반환하면 PASS.
-function getCameraTexture(processGpuResult /*, gl */) {
-  // TODO(0-A, 실기기): 아래 후보 중 벤더링된 xr.js가 노출하는 실제 경로로 확정.
-  //   - processGpuResult?.camerapixelarray / .cameraTexture 계열
-  //   - XR8.GlTextureRenderer가 그리는 텍스처 참조
-  // 확정 전에는 null → 테스트는 GRACEFUL FAIL로 기록(오류 아님).
-  return processGpuResult && (processGpuResult.cameraTexture || null)
+// 카메라 피드 GPU 텍스처 핸들을 얻는다. (0-A 확인 대상)
+// 8th Wall의 GlTextureRenderer 파이프라인 모듈은 processGpu 결과에
+// { gltexturerenderer: { viewportTexture, ... } } 형태로 텍스처를 노출한다.
+// 빌드에 따라 키가 다를 수 있으므로 후보를 순서대로 시도하고, 실패 시
+// 실제 키 목록을 보고해 다음 라운드에서 정확히 짚을 수 있게 한다.
+function getCameraTexture(r) {
+  if (!r) return null
+  return (
+    r.gltexturerenderer?.viewportTexture ||
+    r.gltexturerenderer?.srcTexture ||
+    r.cameraTexture ||
+    r.camerafeedtexture ||
+    null
+  )
+}
+
+// 진단용: processGpuResult의 실제 모양을 문자열로 (XR8 키 덤프로 원인을 잡았던 방식)
+function describeShape(r) {
+  if (!r) return 'processGpuResult 없음'
+  const top = Object.keys(r).join(',')
+  const sub = r.gltexturerenderer ? Object.keys(r.gltexturerenderer).join(',') : '(gltexturerenderer 없음)'
+  return `keys: ${top} · gltexturerenderer: ${sub}`
 }
 
 export function createShaderSmokeTest({ onResult } = {}) {
   let program = null
   let quad = null
   let reported = false
+  let frames = 0
   let uCamera, uTime, uRect, aPos
 
   const report = (pass, note) => {
@@ -82,10 +96,13 @@ export function createShaderSmokeTest({ onResult } = {}) {
     },
     // 카메라 프레임마다: 카메라 텍스처를 셰이더로 변조 시도
     onProcessGpu: ({ processGpuResult }) => {
-      // 텍스처 핸들 확인이 0-A의 핵심 판정
+      // 텍스처 핸들 확인이 0-A의 핵심 판정.
+      // 파이프라인이 안정될 시간을 주고(초기 몇 프레임은 비어 있을 수 있음),
+      // 그래도 못 찾으면 실제 키 모양을 함께 보고해 다음 라운드에서 정확히 짚는다.
       const tex = getCameraTexture(processGpuResult)
-      if (tex == null) {
-        report(false, '카메라 텍스처 핸들 미확인 → getCameraTexture()를 벤더 런타임에 맞춰 확정 필요 (shimmer 불가면 glow 단독)')
+      frames++
+      if (tex == null && frames > 30) {
+        report(false, `카메라 텍스처 핸들 미확인 · ${describeShape(processGpuResult)}`)
       }
       return { smokeTexture: tex }
     },

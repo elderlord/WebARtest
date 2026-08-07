@@ -53,9 +53,17 @@ export function createHud() {
 }
 
 export function showBanner(html) {
+  // 배너가 여러 개일 때 같은 자리에 겹치지 않도록 컨테이너에 세로로 쌓는다.
+  let stack = document.getElementById('banner-stack')
+  if (!stack) {
+    stack = document.createElement('div')
+    stack.id = 'banner-stack'
+    stack.className = 'banner-stack'
+    document.body.appendChild(stack)
+  }
   const b = document.createElement('div')
-  b.className = 'hud__banner'
+  b.className = 'hud__banner hud__banner--stacked'
   b.innerHTML = html
-  document.body.appendChild(b)
+  stack.appendChild(b)
   return b
 }
