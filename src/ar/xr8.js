@@ -92,12 +92,23 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false } = {}) {
     ],
   })
 
+  // 이 빌드에서 파이프라인 모듈이 다른 이름일 수 있다. 없으면 어느 것이 없는지 명확히 보고.
+  const need = ['GlTextureRenderer', 'Threejs', 'XrController']
+  const missing = need.filter((k) => !XR8[k] || typeof XR8[k].pipelineModule !== 'function')
+  if (missing.length) {
+    throw new Error(`XR8 모듈 없음: ${missing.join(', ')} · 사용가능 키: ${Object.keys(XR8).join(',')}`)
+  }
+
   const modules = [
     XR8.GlTextureRenderer.pipelineModule(), // 카메라 피드를 캔버스에 렌더
     XR8.Threejs.pipelineModule(), // three.js 씬 관리
     XR8.XrController.pipelineModule(), // 이미지 타겟 추적 (SLAM은 조건부: runtime.ensureSlam)
-    imageTargetModule(),
   ]
+
+  // 이미지 타겟은 실제 컴파일 타겟이 있을 때만 등록한다.
+  // 0-A(사진 없음, placeholder)에서는 타겟 없이 카메라+HUD만 띄운다.
+  const hasRealTarget = IMAGE_TARGET_NAME && IMAGE_TARGET_NAME !== 'panel-placeholder'
+  if (hasRealTarget) modules.push(imageTargetModule())
 
   // 0-A 셰이더 스모크 테스트 (?smoke): 카메라 텍스처 셰이더 접근 판정
   if (shaderSmokeTest) {
@@ -111,8 +122,16 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false } = {}) {
 
   XR8.addCameraPipelineModules(modules)
 
-  // 인식할 이미지 타겟 등록
-  XR8.XrController.configure({ imageTargets: [IMAGE_TARGET_NAME] })
+  if (hasRealTarget) {
+    XR8.XrController.configure({ imageTargets: [IMAGE_TARGET_NAME] })
+  } else {
+    // 타겟 없이 카메라만: HUD에 0-A 상태 표시
+    hud.setFound(false)
+    showBanner(
+      `<b>0-A 런타임 OK</b> — XR8 로드·카메라 기동. 타겟 미등록(사진 대기).<br>` +
+        `<code>?smoke</code>로 셰이더 접근 판정.`
+    )
+  }
 
   XR8.run({ canvas })
 }
