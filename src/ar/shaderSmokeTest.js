@@ -46,23 +46,23 @@ const VERT = `
 // { gltexturerenderer: { viewportTexture, ... } } 형태로 텍스처를 노출한다.
 // 빌드에 따라 키가 다를 수 있으므로 후보를 순서대로 시도하고, 실패 시
 // 실제 키 목록을 보고해 다음 라운드에서 정확히 짚을 수 있게 한다.
-function getCameraTexture(r) {
-  if (!r) return null
+// 0-A 실측(2026-08-07): processGpuResult.gltexturerenderer에는 {viewport, shader}만
+// 있고 텍스처가 없다. 8th Wall에서 카메라 GPU 텍스처는 **frameStartResult.cameraTexture**로
+// 전달된다(frameStartResult = {cameraTexture, GLctx, textureWidth, textureHeight, ...}).
+function getCameraTexture(frameStartResult, processGpuResult) {
   return (
-    r.gltexturerenderer?.viewportTexture ||
-    r.gltexturerenderer?.srcTexture ||
-    r.cameraTexture ||
-    r.camerafeedtexture ||
+    frameStartResult?.cameraTexture ||
+    processGpuResult?.gltexturerenderer?.viewportTexture ||
+    processGpuResult?.cameraTexture ||
     null
   )
 }
 
-// 진단용: processGpuResult의 실제 모양을 문자열로 (XR8 키 덤프로 원인을 잡았던 방식)
-function describeShape(r) {
-  if (!r) return 'processGpuResult 없음'
-  const top = Object.keys(r).join(',')
-  const sub = r.gltexturerenderer ? Object.keys(r.gltexturerenderer).join(',') : '(gltexturerenderer 없음)'
-  return `keys: ${top} · gltexturerenderer: ${sub}`
+// 진단용: 실제 모양을 문자열로 (XR8 키 덤프로 원인을 잡았던 방식)
+function describeShape(frameStartResult, processGpuResult) {
+  const fs = frameStartResult ? Object.keys(frameStartResult).join(',') : '(frameStartResult 없음)'
+  const pg = processGpuResult ? Object.keys(processGpuResult).join(',') : '(processGpuResult 없음)'
+  return `frameStart: ${fs} · processGpu: ${pg}`
 }
 
 export function createShaderSmokeTest({ onResult } = {}) {
@@ -98,13 +98,13 @@ export function createShaderSmokeTest({ onResult } = {}) {
     },
     // processGpuResult는 onProcessGpu(결과를 "생산"하는 단계)가 아니라
     // onUpdate에서 전달된다(0-A 실측 확인). 여기서 텍스처 핸들을 잡아 둔다.
-    onUpdate: ({ processGpuResult }) => {
+    onUpdate: ({ frameStartResult, processGpuResult }) => {
       frames++
-      const tex = getCameraTexture(processGpuResult)
+      const tex = getCameraTexture(frameStartResult, processGpuResult)
       if (tex) {
         camTex = tex
       } else if (frames > 30) {
-        report(false, `카메라 텍스처 핸들 미확인 · ${describeShape(processGpuResult)}`)
+        report(false, `카메라 텍스처 핸들 미확인 · ${describeShape(frameStartResult, processGpuResult)}`)
       }
     },
     onRender: () => {
