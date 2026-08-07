@@ -142,5 +142,26 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false } = {}) {
     )
   }
 
+  // 캔버스 드로잉 버퍼를 뷰포트에 맞춘다.
+  // XRExtras.FullWindowCanvas를 쓰지 않으므로 직접 처리해야 한다. 이걸 안 하면
+  // 버퍼가 기본 300x150이라 카메라 피드가 화면 일부에만 그려진다(0-A 실측 확인).
+  const fitCanvas = () => {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const w = Math.round(window.innerWidth * dpr)
+    const h = Math.round(window.innerHeight * dpr)
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w
+      canvas.height = h
+    }
+    // three 렌더러가 이미 있으면 함께 갱신
+    const scene = XR8.Threejs.xrScene && XR8.Threejs.xrScene()
+    if (scene && scene.renderer) {
+      scene.renderer.setSize(window.innerWidth, window.innerHeight, false)
+    }
+  }
+  fitCanvas()
+  window.addEventListener('resize', fitCanvas)
+  window.addEventListener('orientationchange', () => setTimeout(fitCanvas, 200))
+
   XR8.run({ canvas })
 }
