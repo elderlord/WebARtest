@@ -8,7 +8,8 @@ dist/
 node_modules/.vite-plugin-basic-ssl/
 
 # self-host 런타임/타겟 실물은 별도 관리 (슬롯 README만 커밋)
-public/xr8/*.js
-public/targets/*
+# XR Engine License: 원형 배포만 허용 + 공개 저장소 재배포 회색지대 → 커밋하지 않음
+public/xr8/*
 !public/xr8/README.md
+public/targets/*
 !public/targets/README.md

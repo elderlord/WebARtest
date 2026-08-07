@@ -94,12 +94,39 @@ Binary를 쓰는 순간 SLAM 여부와 무관하게 라이선스가 걸리기 �
 - SLAM(`xr-slam.js`)이 바이너리에 **포함**되어 있어, 바이너리 경로에선 SLAM 추가에
   새 라이선스 단계가 없다(동일 Agreement).
 
-**경로 선택 (미결, 사용자·기관 판단):**
+**경로 결정 (2026-08-07): A로 개념검증 → B로 확장 가능하게 설계.**
 - **경로 A — Distributed Binary**: 빠름, SLAM 포함. 라이선스 적용. 프로덕션 전 §1.2 검토.
 - **경로 B — MIT 빌드**: §1.2 제약 없음. 직접 빌드, 닫힌 SLAM 미포함, 작업량 큼.
 
+A와 B는 **동일한 `XR8` 공개 API**를 노출하므로, 앱 코드(파이프라인·정합박스·계측·
+셰이더)는 A/B 공통이다. 차이는 세 축뿐: 런타임 파일 / 귀속표시 / SLAM 가용성.
+이를 **런타임 어댑터(`src/ar/runtime.js`)의 `RUNTIME` config 한 곳**에 격리한다:
+
+| 축 | 경로 A | 경로 B | 전환 |
+|---|---|---|---|
+| `url` | `/xr8/xr.js` | MIT 빌드 산출물 | config |
+| `requiresAttribution` | true | false | 플래그 |
+| `hasSlamChunk` | true | false | 플래그(+`ensureSlam` no-op) |
+
+→ A→B는 이 config 교체 + (필요 시) MIT 빌드 파이프라인 구축이 전부. 앱 코드 불변.
+**유일한 환원 불가 caveat**: 0-B가 "SLAM 필요"로 판정하면 경로 B(닫힌 SLAM 없음)는
+그 축에서 A를 못 따라온다. 우리 분석(소형패널+제목글자→이미지타겟 단독 가능성)대로면
+SLAM 불필요로 나올 공산이 크고, 그러면 B는 깔끔한 drop-in. 코드가 아니라 검증이 답할 사안.
+
 **바이너리 git 커밋 안 함**(기본): 30MB 대용량 + "원형 배포" 조항의 공개 저장소
 재배포 회색지대. 벤더링은 로컬/CI에서 하고, 획득 경로만 문서화(`public/xr8/README.md`).
+
+### 3.4 0-A 배선 완료 (2026-08-07)
+- `src/ar/runtime.js` — A↔B 어댑터(위 표)
+- `src/ar/attribution.js` + CSS — §1.3 "Powered by 8th Wall" + 라이선스/무보증 고지
+  (`requiresAttribution`일 때만 렌더 → 경로 B에서 자동 off)
+- `src/ar/shaderSmokeTest.js` — 카메라 텍스처→프래그먼트 셰이더 접근 판정 하네스
+  (`?smoke`로 활성). **정직한 상태**: GLSL·모듈 골격은 확정, 카메라 텍스처 핸들을 얻는
+  `getCameraTexture()` 한 지점만 벤더 런타임에 맞춰 실기기에서 확정 필요 — 그 확정이
+  곧 0-A 스모크 결과(PASS→shimmer 유지 / FAIL→glow 단독).
+- 런타임(`xr.js`,`xr-slam.js`,`resources/`)은 `public/xr8/`에 로컬 벤더링(git 제외).
+- 빌드·dev 서버(런타임/귀속 svg 서빙 200) 검증 완료.
+- **남은 실측(실기기)**: XR8 기동 + 셰이더 스모크 PASS/FAIL + world scale calibration.
 
 ### 3.2 shimmer의 셰이더 접근성은 Phase 1의 생사 조건 → 0-A로 당김
 `shimmer`가 단순 overlay가 아니라 **카메라 텍스처를 읽어 특정 영역을 변조**하는

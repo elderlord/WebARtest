@@ -1,6 +1,8 @@
 import * as THREE from 'three'
 import { createAlignmentBox } from './alignmentBox.js'
 import { Metrics, FpsMeter } from './metrics.js'
+import { createShaderSmokeTest } from './shaderSmokeTest.js'
+import { showBanner } from '../hud.js'
 
 // 8th Wall XR8 카메라 파이프라인 위에 three.js 씬을 얹고,
 // 이미지 타겟 인식 시 정합 박스를 타겟에 부착한다. (0단계 계측 하네스)
@@ -16,7 +18,9 @@ import { Metrics, FpsMeter } from './metrics.js'
 // TODO(사진 확보 후): 컴파일된 이미지 타겟 이름으로 교체.
 export const IMAGE_TARGET_NAME = 'panel-placeholder'
 
-export function startXr8({ canvas, hud }) {
+// opts.shaderSmokeTest: true면 0-A 셰이더 스모크 테스트 모듈을 파이프라인에 추가한다.
+//   (?smoke 쿼리로 켜는 것을 권장 — 아래 startXr8 호출부에서 판단)
+export function startXr8({ canvas, hud, shaderSmokeTest = false } = {}) {
   const XR8 = window.XR8
   const box = createAlignmentBox()
   const metrics = new Metrics(30)
@@ -88,12 +92,24 @@ export function startXr8({ canvas, hud }) {
     ],
   })
 
-  XR8.addCameraPipelineModules([
+  const modules = [
     XR8.GlTextureRenderer.pipelineModule(), // 카메라 피드를 캔버스에 렌더
     XR8.Threejs.pipelineModule(), // three.js 씬 관리
-    XR8.XrController.pipelineModule(), // 6DoF 트래킹 (SLAM 바이너리 존재 시 자세 유지)
+    XR8.XrController.pipelineModule(), // 이미지 타겟 추적 (SLAM은 조건부: runtime.ensureSlam)
     imageTargetModule(),
-  ])
+  ]
+
+  // 0-A 셰이더 스모크 테스트 (?smoke): 카메라 텍스처 셰이더 접근 판정
+  if (shaderSmokeTest) {
+    modules.push(
+      createShaderSmokeTest({
+        onResult: ({ pass, note }) =>
+          showBanner(`<b>셰이더 스모크: ${pass ? 'PASS' : 'FAIL'}</b><br>${note}`),
+      })
+    )
+  }
+
+  XR8.addCameraPipelineModules(modules)
 
   // 인식할 이미지 타겟 등록
   XR8.XrController.configure({ imageTargets: [IMAGE_TARGET_NAME] })
