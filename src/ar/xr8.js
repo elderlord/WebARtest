@@ -93,6 +93,10 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false } = {}) {
     ],
   })
 
+  // XR8.Threejs 파이프라인 모듈은 전역 window.THREE를 요구한다(0-A 실측 확인).
+  // 우리는 three를 ES 모듈로 번들하므로 전역에 노출해 준다.
+  if (!window.THREE) window.THREE = THREE
+
   // 이 빌드에서 파이프라인 모듈이 다른 이름일 수 있다. 없으면 어느 것이 없는지 명확히 보고.
   const need = ['GlTextureRenderer', 'Threejs', 'XrController']
   const missing = need.filter((k) => !XR8[k] || typeof XR8[k].pipelineModule !== 'function')
