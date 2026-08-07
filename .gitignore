@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+
+# Vite basic-ssl 자체 서명 인증서 캐시
+.vite/
+node_modules/.vite-plugin-basic-ssl/
+
+# self-host 런타임/타겟 실물은 별도 관리 (슬롯 README만 커밋)
+public/xr8/*.js
+public/targets/*
+!public/xr8/README.md
+!public/targets/README.md

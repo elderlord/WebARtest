@@ -1,0 +1,101 @@
+:root {
+  color-scheme: dark;
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --bad: #f87171;
+  --fg: #e5e7eb;
+  --panel: rgba(17, 24, 39, 0.72);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app,
+canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- HUD: 0단계 계측 판독용 오버레이 ---- */
+.hud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.hud__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  color: var(--fg);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  backdrop-filter: blur(6px);
+}
+
+.hud__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--bad);
+  flex: none;
+  transition: background 0.15s;
+}
+
+.hud__dot--found {
+  background: var(--ok);
+}
+
+.hud__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud__metric b {
+  color: #fff;
+  font-weight: 600;
+}
+
+.hud__banner {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  left: 12px;
+  right: 12px;
+  background: var(--panel);
+  color: var(--fg);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  z-index: 10;
+  backdrop-filter: blur(6px);
+}
+
+.hud__banner b {
+  color: var(--warn);
+}

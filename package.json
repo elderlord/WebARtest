@@ -1,0 +1,19 @@
+{
+  "name": "webar-panel-emphasis",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "WebAR 전시패널 텍스트 강조 — 0단계 거리·타겟 계측 하네스 (8th Wall Image Targets + three.js)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^1.1.0",
+    "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  }
+}
