@@ -36,15 +36,15 @@ const VERT = `
   attribute vec2 aPos;
   varying vec2 vUv;
   void main() {
-    vUv = (aPos + 1.0) * 0.5;
+    // 카메라 텍스처는 위→아래로 저장되고 GL 클립공간은 아래가 원점이라 v를 뒤집는다.
+    // (뒤집지 않으면 화면이 상하 반전 — 0-A 실측에서 확인)
+    vUv = vec2((aPos.x + 1.0) * 0.5, 1.0 - (aPos.y + 1.0) * 0.5);
     gl_Position = vec4(aPos, 0.0, 1.0);
   }
 `
 
-// 카메라 피드 GPU 텍스처 핸들을 얻는다. (0-A 확인 대상)
-// 8th Wall의 GlTextureRenderer 파이프라인 모듈은 processGpu 결과에
-// { gltexturerenderer: { viewportTexture, ... } } 형태로 텍스처를 노출한다.
-// 빌드에 따라 키가 다를 수 있으므로 후보를 순서대로 시도하고, 실패 시
+// 카메라 피드 GPU 텍스처 핸들을 얻는다. (0-A 확정: frameStartResult.cameraTexture)
+// 후보를 순서대로 시도하고, 실패 시
 // 실제 키 목록을 보고해 다음 라운드에서 정확히 짚을 수 있게 한다.
 // 0-A 실측(2026-08-07): processGpuResult.gltexturerenderer에는 {viewport, shader}만
 // 있고 텍스처가 없다. 8th Wall에서 카메라 GPU 텍스처는 **frameStartResult.cameraTexture**로
