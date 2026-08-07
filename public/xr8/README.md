@@ -1,23 +1,59 @@
 # XR8 런타임 슬롯 (self-host)
 
-이 폴더에 **8th Wall XR8 엔진 런타임 JS**를 벤더링한다. 앱은 `/xr8/xr8.js`를 로드한다.
+이 폴더에 **8th Wall 엔진 런타임**을 벤더링한다. self-host의 표준 파일명은 `xr.js`다.
+앱은 이 런타임을 로드해 `window.XR8`을 얻는다.
 
-## 왜 비어 있나
+> 0-A 조사(2026-08-07)로 아래 구조가 **확정**되었다. 이전의 "막연히 xr8.js를 찾는"
+> 서술을 공식 self-host 구조로 대체한다.
 
-8th Wall 클라우드(`apps.8thwall.com/xrweb?appKey=…`)는 2026-02-28 종료되어, 과거처럼
-스크립트 태그로 클라우드 런타임을 불러올 수 없다. 이제 **오픈소스 엔진 빌드 산출물을
-직접 호스팅**해야 한다. 이 파일의 출처·정확한 파일명은 오프라인에서 확정하지 못했으므로
-슬롯으로 비워 둔다. (프로젝트 최상위 `README.md`의 "미확정" 항목 참고)
+## 확정된 self-host 방식
 
-## 채우는 방법 (택1, 착수 시 실물로 확인)
+과거(클라우드) 방식:
+```html
+<script src="//apps.8thwall.com/xrweb?appKey=..."></script>   <!-- 종료됨 -->
+```
+현재(self-host) 방식 — 클라우드 스크립트를 제거하고 벤더링한 런타임으로 교체:
+```html
+<script async src="./xr.js"></script>
+```
 
-1. **오픈소스 엔진 빌드**: `github.com/8thwall/8thwall`의 `packages/engine`를 빌드해
-   나온 UMD/번들 JS를 `xr8.js`로 이 폴더에 복사.
-2. **데스크톱 앱 export**: 8th Wall 데스크톱 앱으로 프로젝트를 만들고 export한 산출물에서
-   런타임 JS를 추출해 복사.
-3. 기존 배포물(예: 관내 `nsmsuperpower.com`)이 self-host 중인 런타임 파일 구성을 참고
-   (문서 §8: `external/xr/xr.js`, `xr-slam.js`).
+### SLAM은 별도 chunk (progressive enhancement)
 
-> SLAM(6DoF 자세 유지)은 **바이너리 전용 라이선스**로 별도 배포된다. 이미지 타겟
-> 인식만으로 0단계 계측은 가능하나, 근접 유지 성능 검증에는 SLAM 바이너리가 필요하다.
-> 상시 배포 전 XR Engine License Agreement 원문 검토가 선행되어야 한다 (문서 §7).
+**MIT-only로 시작하려면 SLAM chunk를 로드하지 않으면 된다.** 이미지 타겟 추적은
+기본 런타임만으로 동작한다. 나중에 0-B 결과가 SLAM을 요구하면, 그때만 chunk를 켠다:
+
+```html
+<script async src="./xr.js" data-preload-chunks="slam"></script>
+```
+또는 코드에서:
+```js
+await XR8.loadChunk('slam')   // 엔진 시작 전 호출
+```
+
+즉 스펙의 "0-B2 조건부 SLAM"이 엔진 API 차원에서 그대로 성립한다 —
+SLAM 도입은 chunk 로드 한 줄 추가이고, 그 시점에만 바이너리 라이선스 검토가
+실질 blocker로 승격된다(스펙 §5, §3.1).
+
+## 런타임 파일을 어디서 받나
+
+- **`github.com/8thwall/engine`** — "The distributed 8th Wall Engine binary".
+  여기서 `xr.js`(및 slam/face 등 chunk)를 받아 이 폴더에 벤더링한다.
+- **`github.com/8thwall/8thwall`** — MIT 소스(엔진 프레임워크, Image Targets,
+  `image-target-cli`, three.js/A-Frame 통합). 빌드 산출물 경로는 착수 시 확인.
+- 참고 선례(계획서 §8): 관내 `nsmsuperpower.com`이 `external/xr/xr.js`,
+  `xr-slam.js`를 self-host 중 — 파일 구성의 실물 참고.
+
+## 이 앱에서의 로드 경로
+
+현재 `src/main.js`는 `/xr8/xr8.js`를 동적 로드하도록 되어 있다. 실제 벤더링 파일명이
+`xr.js`이면, `src/main.js`의 `XR8_RUNTIME_URL`을 `/xr8/xr.js`로 맞추거나 파일명을
+통일한다. 런타임이 없으면 앱은 DEV 모드로 폴백한다.
+
+## 0-A 스모크 테스트 (런타임 벤더링 후 실행)
+
+1. `xr.js` 벤더링 → `window.XR8` 초기화 + 카메라 피드 표시 확인 (SLAM chunk 없이)
+2. **카메라 텍스처 → 커스텀 셰이더 접근**: `XR8.GlTextureRenderer.pipelineModule()`이
+   카메라 피드를 GPU 텍스처로 그린다. 커스텀 카메라 파이프라인 모듈에서 이 텍스처를
+   프래그먼트 셰이더로 샘플·변조할 수 있는지 확인. → 가능하면 shimmer 유지, 불가하면
+   글로우 단독(스펙 0-A). *이건 문서로 단정 못 하며 반드시 실행해 확인한다.*
+3. world scale calibration: 폭 아는 평면 타겟을 50/100/150cm에서 측정(스펙 §6.2).

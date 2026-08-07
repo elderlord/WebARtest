@@ -27,10 +27,14 @@ export function startXr8({ canvas, hud }) {
   let lastHeight = 1
 
   const attachBox = (detail) => {
-    const { position, rotation, scale, scaledWidth, scaledHeight } = detail
+    const { position, rotation, scaledWidth, scaledHeight } = detail
     box.position.copy(position)
     box.quaternion.copy(rotation)
-    if (scale != null) box.scale.setScalar(scale)
+    // 주의(스펙 §6.3): detail에는 scale과 scaledWidth/Height가 함께 온다.
+    // scaledWidth/Height가 이미 scale이 반영된 실측 크기이므로, box.scale까지
+    // 따로 걸면 이중 적용이 된다. 여기서는 크기의 단일 출처로 scaledWidth/Height만
+    // 쓴다(geometry를 실측 크기로 resize). 실 런타임 연결 시 줄자로 검증해
+    // 규약이 다르면 이 지점만 조정한다.
     if (scaledWidth && scaledHeight) {
       lastWidth = scaledWidth
       lastHeight = scaledHeight

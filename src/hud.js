@@ -2,7 +2,9 @@
 // 문서 §5 0단계 측정 항목을 화면에서 바로 읽을 수 있게 노출한다:
 //   - 인식 성공/실패 상태 (최대 거리·최대 기울기 판정 시 이 지시등이 꺼지는 지점을 기록)
 //   - 카메라-타겟 거리 (cm)
-//   - 정지 상태 지터 폭 (최근 프레임 위치 표준편차, mm)
+//   - Pose 변동 폭 (최근 프레임 위치 표준편차, mm)
+//     ※ 스펙 §6.1: 이 값은 손떨림+카메라이동+pose노이즈의 합이다. "tracking
+//       precision"으로 오해석 금지. 엔진 정밀도는 클램프 고정 별도 프로토콜로 측정.
 export function createHud() {
   const root = document.createElement('div')
   root.className = 'hud'
@@ -14,7 +16,7 @@ export function createHud() {
     <div class="hud__row hud__metrics">
       <span class="hud__metric">거리 <b id="hud-dist">–</b></span>
       <span class="hud__metric">기울기 <b id="hud-tilt">–</b></span>
-      <span class="hud__metric">지터 <b id="hud-jitter">–</b></span>
+      <span class="hud__metric">Pose 변동 <b id="hud-jitter">–</b></span>
       <span class="hud__metric">FPS <b id="hud-fps">–</b></span>
     </div>
   `
@@ -39,10 +41,10 @@ export function createHud() {
         el.jitter.textContent = '–'
       }
     },
-    setMetrics({ distanceCm, tiltDeg, jitterMm }) {
+    setMetrics({ distanceCm, tiltDeg, poseVarMm }) {
       if (distanceCm != null) el.dist.textContent = `${distanceCm.toFixed(0)} cm`
       if (tiltDeg != null) el.tilt.textContent = `${tiltDeg.toFixed(0)}°`
-      if (jitterMm != null) el.jitter.textContent = `${jitterMm.toFixed(1)} mm`
+      if (poseVarMm != null) el.jitter.textContent = `${poseVarMm.toFixed(1)} mm`
     },
     setFps(fps) {
       el.fps.textContent = String(Math.round(fps))

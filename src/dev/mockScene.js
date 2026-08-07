@@ -51,7 +51,7 @@ export function startMockScene({ canvas, hud }) {
     hud.setMetrics({
       distanceCm: 120 + Math.sin(t * 0.6) * 8,
       tiltDeg: Math.abs(THREE.MathUtils.radToDeg(yaw)),
-      jitterMm: 0.2 + Math.abs(Math.sin(t * 3)) * 0.3,
+      poseVarMm: 0.2 + Math.abs(Math.sin(t * 3)) * 0.3,
     })
     hud.setFps(1000 / 16)
 

@@ -2,9 +2,11 @@ import * as THREE from 'three'
 
 // 0단계 계측값 계산 헬퍼.
 // 이미지 타겟의 월드 변환(위치/회전)과 카메라로부터 다음을 도출한다:
-//   - 거리: 카메라 원점 ~ 타겟 중심 (cm)
+//   - 거리: 카메라 원점 ~ 타겟 중심 (cm)  ※ 스펙 §6.2: world scale calibration
+//           전에는 nominal 값. three 단위=1m 가정에 의존.
 //   - 기울기: 타겟 법선과 카메라 시선의 각도 (deg, 정면 = 0)
-//   - 지터: 최근 N프레임 타겟 위치의 3D 표준편차 (mm)
+//   - Pose 변동: 최근 N프레임 타겟 위치의 3D 표준편차 (mm)
+//     ※ 스펙 §6.1: 손떨림+카메라이동+pose노이즈의 합. tracking precision 아님.
 export class Metrics {
   constructor(windowSize = 30) {
     this.windowSize = windowSize
@@ -25,12 +27,12 @@ export class Metrics {
     const toCam = new THREE.Vector3().subVectors(camera.position, targetPos).normalize()
     const tiltDeg = THREE.MathUtils.radToDeg(Math.acos(THREE.MathUtils.clamp(normal.dot(toCam), -1, 1)))
 
-    // 지터: 위치 표본 표준편차
+    // Pose 변동: 위치 표본 표준편차
     this.samples.push(targetPos.clone())
     if (this.samples.length > this.windowSize) this.samples.shift()
-    const jitterMm = this._stdDevMm()
+    const poseVarMm = this._stdDevMm()
 
-    return { distanceCm, tiltDeg, jitterMm }
+    return { distanceCm, tiltDeg, poseVarMm }
   }
 
   _stdDevMm() {
