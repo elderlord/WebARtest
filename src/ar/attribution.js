@@ -5,6 +5,8 @@
 //   (iii) 본 Agreement 참조(텍스트 또는 URI/하이퍼링크), (iv) 무보증 고지 참조.
 // zip의 resources/powered-by.svg가 귀속 마크다. 벤더링되면 이미지로, 없으면 텍스트로.
 const AGREEMENT_URL = 'https://github.com/8thwall/engine/blob/main/LICENSE'
+// 귀속 마크는 CDN(공식 배포)의 것을 그대로 참조 → Pages에서 바로 표시, 로드 실패 시 텍스트 폴백.
+const POWERED_BY_SVG = 'https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/resources/powered-by.svg'
 
 export function showAttribution() {
   if (document.getElementById('xr8-attribution')) return
@@ -12,7 +14,7 @@ export function showAttribution() {
   el.id = 'xr8-attribution'
   el.className = 'attribution'
   el.innerHTML = `
-    <img class="attribution__logo" src="/xr8/resources/powered-by.svg" alt="Powered by 8th Wall"
+    <img class="attribution__logo" src="${POWERED_BY_SVG}" alt="Powered by 8th Wall"
          onerror="this.style.display='none';this.nextElementSibling.style.display='inline'" />
     <span class="attribution__fallback" style="display:none">Powered by 8th Wall</span>
     <a class="attribution__link" href="${AGREEMENT_URL}" target="_blank" rel="noopener">

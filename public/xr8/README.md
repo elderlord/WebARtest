@@ -1,7 +1,13 @@
-# XR8 런타임 슬롯 (self-host)
+# XR8 런타임 슬롯 (self-host 옵션)
+
+> **현재 기본 로드 방식 = CDN.** 앱은 `src/ar/runtime.js`의 `RUNTIME.url`이 가리키는
+> 공식 CDN(`cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js`)에서 런타임을
+> 로드한다. GitHub Pages 배포에서 바이너리를 저장소에 안 올려도 동작하고, 우리가
+> 재배포하지 않으므로 라이선스상 가장 깨끗하다. **이 폴더 벤더링은 오프라인/self-host가
+> 필요할 때의 옵션이다.**
 
 이 폴더에 **8th Wall 엔진 런타임**을 벤더링한다. self-host의 표준 파일명은 `xr.js`다.
-앱은 이 런타임을 로드해 `window.XR8`을 얻는다.
+앱은 이 런타임을 로드해 `window.XR8`을 얻는다. (self-host 시 `RUNTIME.url`을 `/xr8/xr.js`로)
 
 > 0-A 조사(2026-08-07)로 아래 구조가 **확정**되었다. 이전의 "막연히 xr8.js를 찾는"
 > 서술을 공식 self-host 구조로 대체한다.

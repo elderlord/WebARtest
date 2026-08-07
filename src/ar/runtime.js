@@ -15,8 +15,12 @@
 export const RUNTIME = {
   // 현재: 경로 A — Niantic Distributed Engine Binary
   path: 'A',
-  // self-host 런타임 파일 (public/xr8/에 벤더링, git 제외)
-  url: '/xr8/xr.js',
+  // 런타임 로드: 공식 CDN(jsdelivr, @8thwall/engine-binary)에서 직접 로드한다.
+  //   - 우리가 재배포하지 않고 Niantic 공식 배포를 원형 그대로 사용 → 라이선스상 가장 깨끗
+  //   - GitHub Pages 배포에서 바이너리를 git에 안 올려도 동작
+  //   - slam/face chunk도 같은 CDN 베이스에서 지연 로드됨
+  // self-host로 바꾸려면 '/xr8/xr.js'로 교체(public/xr8/에 벤더링, git 제외).
+  url: 'https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js',
   // SLAM은 조건부(0-B2): 기본은 preload 안 함. 필요 판정 시 ensureSlam()로 지연 로드.
   preloadChunks: [],
   hasSlamChunk: true, // 바이너리에 xr-slam.js 포함 → ensureSlam() 사용 가능
