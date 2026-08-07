@@ -13,6 +13,14 @@
   <body>
     <!-- three.js 캔버스와 HUD가 여기에 마운트된다 -->
     <div id="app"></div>
+
+    <!-- 부팅 진단: main.js가 실행되면 제거된다.
+         이 문구가 계속 보이면 = HTML은 떴으나 스크립트가 실행 안 됨(자산 404/모듈 오류).
+         완전 백색(이 문구조차 없음)이면 = HTML 자체가 안 뜸(URL/배포/캐시 문제). -->
+    <div id="boot" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font:14px/1.7 -apple-system,sans-serif;color:#444">
+      로딩 중… 몇 초 뒤에도 이 문구만 보이면 스크립트/자산 로드 실패입니다.
+    </div>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

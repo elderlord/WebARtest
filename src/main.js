@@ -8,6 +8,9 @@ import { showAttribution } from './ar/attribution.js'
 // 없으면 DEV 모드로 분기한다. → 사진/런타임이 없어도 실기기에서 셸 점검 가능.
 // 경로 A/B 차이는 runtime.js의 RUNTIME config에만 있고 아래 코드는 불변이다.
 
+// main.js가 실행되면 부팅 진단 문구 제거 (index.html의 #boot)
+document.getElementById('boot')?.remove()
+
 const app = document.getElementById('app')
 const canvas = document.createElement('canvas')
 canvas.id = 'camerafeed'
