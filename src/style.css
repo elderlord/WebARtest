@@ -81,6 +81,14 @@ canvas {
   font-weight: 600;
 }
 
+/* 엔진 원시값 진단 줄 */
+.hud__debug {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: #9ca3af;
+  word-break: break-all;
+}
+
 .hud__banner {
   position: fixed;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);

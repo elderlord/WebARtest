@@ -22,6 +22,9 @@ import { RUNTIME } from './runtime.js'
 // 각 타겟은 public/targets/<name>.json (+ <name>_luminance.png)로 배치한다.
 const TARGETS_DIR = 'targets'
 
+// 진단 출력용 짧은 수치 포맷
+const fmt = (v) => (typeof v === 'number' ? (Math.abs(v) < 100 ? v.toFixed(3) : v.toFixed(1)) : '?')
+
 // 컴파일된 타겟들을 로드한다. 없으면 빈 배열(0-A 모드: 카메라만).
 export async function loadImageTargets(base = import.meta.env.BASE_URL || '/') {
   const dir = `${base}${TARGETS_DIR}`
@@ -30,10 +33,15 @@ export async function loadImageTargets(base = import.meta.env.BASE_URL || '/') {
     if (!res.ok) return []
     const { targets = [] } = await res.json()
     const loaded = await Promise.all(
-      targets.map(async (name) => {
+      targets.map(async (entry) => {
+        // 매니페스트 항목은 문자열 또는 { name, widthMm } 객체를 허용한다.
+        // widthMm(실물 가로 폭)이 있으면 world scale calibration(스펙 §6.2)에 쓴다.
+        const name = typeof entry === 'string' ? entry : entry.name
+        const widthMm = typeof entry === 'object' ? entry.widthMm : undefined
         const r = await fetch(`${dir}/${name}.json`, { cache: 'no-cache' })
         if (!r.ok) throw new Error(`타겟 로드 실패: ${name}`)
         const data = await r.json()
+        if (widthMm) data.widthMm = widthMm
         // imagePath는 CLI 기본값이 'image-targets/..'이므로 실제 서빙 경로로 교정한다.
         const file = String(data.imagePath || '').split('/').pop()
         data.imagePath = `${dir}/${file}`
@@ -54,6 +62,11 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
   const XR8 = window.XR8
   // 인식 대상 이름 집합 (여러 패널 확장 대비). 비어 있으면 카메라만(0-A 모드).
   const targetNames = new Set(imageTargets.map((t) => t.name).filter(Boolean))
+  // 타겟별 실물 폭(mm) — 엔진 단위를 미터로 환산하는 데 쓴다(스펙 §6.2)
+  const widthMmByName = new Map(imageTargets.filter((t) => t.widthMm).map((t) => [t.name, t.widthMm]))
+  // 엔진 1단위 = 몇 m 인가. imagefound에서 scaledWidth와 실물 폭을 비교해 정한다.
+  let metersPerUnit = null
+  let rawInfo = 'raw –'
   const box = createAlignmentBox()
   const metrics = new Metrics(30)
   const fps = new FpsMeter()
@@ -63,7 +76,15 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
   let lastHeight = 1
 
   const attachBox = (detail) => {
-    const { position, rotation, scaledWidth, scaledHeight } = detail
+    const { position, rotation, scale, scaledWidth, scaledHeight, name } = detail
+    // 엔진 원시값을 화면에 노출한다. disableWorldTracking 모드에서는 좌표가
+    // 미터가 아닐 수 있어(0-B 실측), 규약을 눈으로 확인한 뒤 환산한다.
+    const wMm = widthMmByName.get(name)
+    if (wMm && scaledWidth) metersPerUnit = wMm / 1000 / scaledWidth
+    rawInfo =
+      `raw sw=${fmt(scaledWidth)} sh=${fmt(scaledHeight)} scale=${fmt(scale)}` +
+      ` pos=(${fmt(position?.x)},${fmt(position?.y)},${fmt(position?.z)})` +
+      (metersPerUnit ? ` · 1u=${(metersPerUnit * 100).toFixed(1)}cm` : '')
     box.position.copy(position)
     box.quaternion.copy(rotation)
     // 주의(스펙 §6.3): detail에는 scale과 scaledWidth/Height가 함께 온다.
@@ -92,7 +113,13 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
       if (box.visible) {
         const { camera } = XR8.Threejs.xrScene()
         const m = metrics.update(box.position, box.quaternion, camera)
+        // metrics는 "1단위=1m"를 가정한다. calibration이 잡히면 실제 배율로 보정.
+        if (metersPerUnit) {
+          m.distanceCm *= metersPerUnit
+          m.poseVarMm *= metersPerUnit
+        }
         hud.setMetrics(m)
+        hud.setDebug(rawInfo)
       }
     },
     listeners: [

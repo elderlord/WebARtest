@@ -19,6 +19,7 @@ export function createHud() {
       <span class="hud__metric">Pose 변동 <b id="hud-jitter">–</b></span>
       <span class="hud__metric">FPS <b id="hud-fps">–</b></span>
     </div>
+    <div class="hud__row hud__debug" id="hud-debug">raw –</div>
   `
   document.body.appendChild(root)
 
@@ -29,6 +30,7 @@ export function createHud() {
     tilt: root.querySelector('#hud-tilt'),
     jitter: root.querySelector('#hud-jitter'),
     fps: root.querySelector('#hud-fps'),
+    debug: root.querySelector('#hud-debug'),
   }
 
   return {
@@ -48,6 +50,10 @@ export function createHud() {
     },
     setFps(fps) {
       el.fps.textContent = String(Math.round(fps))
+    },
+    // 엔진 원시값 표시 — 좌표/스케일 규약을 눈으로 확정하기 위한 진단용
+    setDebug(text) {
+      el.debug.textContent = text
     },
   }
 }

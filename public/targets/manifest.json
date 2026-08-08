@@ -1,3 +1,5 @@
 {
-  "targets": ["target0b"]
+  "targets": [
+    { "name": "target0b", "widthMm": 210 }
+  ]
 }
