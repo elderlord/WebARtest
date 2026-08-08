@@ -18,7 +18,8 @@ export function createHud() {
       <span class="hud__metric">기울기 <b id="hud-tilt">–</b></span>
       <span class="hud__metric">Pose 변동 <b id="hud-jitter">–</b></span>
       <span class="hud__metric">FPS <b id="hud-fps">–</b></span>
-      <span class="hud__metric">최대인식 <b id="hud-maxdist">–</b></span>
+      <span class="hud__metric">획득거리 <b id="hud-acq">–</b></span>
+      <span class="hud__metric">유지최대 <b id="hud-maxdist">–</b></span>
       <span class="hud__metric">재획득 <b id="hud-reacq">0</b></span>
     </div>
     <div class="hud__row hud__debug" id="hud-debug">raw –</div>
@@ -34,6 +35,7 @@ export function createHud() {
     fps: root.querySelector('#hud-fps'),
     debug: root.querySelector('#hud-debug'),
     maxdist: root.querySelector('#hud-maxdist'),
+    acq: root.querySelector('#hud-acq'),
     reacq: root.querySelector('#hud-reacq'),
   }
 
@@ -59,9 +61,14 @@ export function createHud() {
     setDebug(text) {
       el.debug.textContent = text
     },
-    // 0-B 측정: 인식에 성공한 최대 거리(peak hold)와 재획득 횟수
+    // 0-B 측정 — 두 거리를 구분한다(실측으로 드러난 차이):
+    //   획득거리: 미인식 상태에서 처음 잡히는 거리 (관람객이 다가와야 하는 거리)
+    //   유지최대: 일단 잡힌 뒤 유지되는 최대 거리 (보통 획득거리보다 멀다)
     setMaxDistance(cm) {
       el.maxdist.textContent = cm > 0 ? `${cm.toFixed(0)} cm` : '–'
+    },
+    setAcquire(lastCm, bestCm) {
+      el.acq.textContent = lastCm > 0 ? `${lastCm.toFixed(0)} / 최원 ${bestCm.toFixed(0)}cm` : '–'
     },
     setReacquire(n) {
       el.reacq.textContent = String(n)

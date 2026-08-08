@@ -77,6 +77,9 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
   let maxDistCm = 0
   let reacquireCount = 0
   let everFound = false
+  // 획득 거리: imagefound 시점의 거리. 유지 거리와 구분해서 재야 한다
+  // (실측: 가까이서 획득 후 물러나면 훨씬 멀리까지 유지됨 → 서비스상 중요한 값은 획득 거리)
+  let bestAcquireCm = 0
   const box = createAlignmentBox()
   // 0-D 단어 정합 probe (타겟에 <name>_words.json 이 있을 때만)
   const wordsByName = new Map(imageTargets.filter((t) => t.words?.length).map((t) => [t.name, t.words]))
@@ -159,6 +162,14 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
           metrics.reset()
           attachBox(detail)
           hud.setFound(true)
+          // 이 시점의 거리 = 초기 획득 거리
+          try {
+            const { camera } = XR8.Threejs.xrScene()
+            let cm = box.position.distanceTo(camera.position) * 100
+            if (metersPerUnit) cm *= metersPerUnit
+            if (cm > bestAcquireCm) bestAcquireCm = cm
+            hud.setAcquire(cm, bestAcquireCm)
+          } catch {}
         },
       },
       {
@@ -222,9 +233,8 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
     // image-target-cli 산출 JSON을 그대로 주입한다 (README 확인).
     XR8.XrController.configure({ imageTargetData: imageTargets })
     showBanner(
-      `<b>0-D 단어 정합</b> — 초록=추적 영역, ` +
-        `<span style="color:#60a5fa">파랑</span>=단어 probe(생각·중·실측).<br>` +
-        `각 단어 위에서 probe가 얼마나 어긋나는지 보세요. 글자 높이 ≈16mm.`
+      `<b>0-B/0-D 실측</b> — <span style="color:#60a5fa">파랑</span>=단어 probe.<br>` +
+        `<b>획득거리</b>=처음 잡히는 거리(뒤에서 다가오며), <b>유지최대</b>=잡힌 뒤 버티는 거리.`
     )
   } else {
     // 타겟 없이 카메라만: HUD에 0-A 상태 표시
