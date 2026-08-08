@@ -69,6 +69,32 @@ export function createHud() {
   }
 }
 
+// 박스 크기 미세조정 바 — 정합 배율(k)을 화면에서 직접 맞춰 수치를 읽는다.
+// 엔진의 크기 규약이 후보 공식과 정확히 맞지 않아(0-B 실측), 실물에 맞춘 k를
+// 읽어 공식을 확정하기 위한 도구.
+export function createSizeTuner({ onChange, initial = 1 }) {
+  let k = initial
+  const bar = document.createElement('div')
+  bar.className = 'tuner'
+  bar.innerHTML = `
+    <button class="tuner__btn" data-d="-0.05">−5%</button>
+    <button class="tuner__btn" data-d="-0.01">−1%</button>
+    <span class="tuner__val">k <b id="tuner-k">1.000</b></span>
+    <button class="tuner__btn" data-d="0.01">+1%</button>
+    <button class="tuner__btn" data-d="0.05">+5%</button>
+  `
+  document.body.appendChild(bar)
+  const out = bar.querySelector('#tuner-k')
+  bar.addEventListener('click', (e) => {
+    const d = e.target && e.target.dataset && e.target.dataset.d
+    if (!d) return
+    k = Math.max(0.2, Math.min(3, k + parseFloat(d)))
+    out.textContent = k.toFixed(3)
+    onChange && onChange(k)
+  })
+  return { get value() { return k } }
+}
+
 export function showBanner(html) {
   // 배너가 여러 개일 때 같은 자리에 겹치지 않도록 컨테이너에 세로로 쌓는다.
   let stack = document.getElementById('banner-stack')

@@ -163,3 +163,38 @@ canvas {
   border-radius: 5px;
   padding: 2px 6px;
 }
+
+/* 정합 배율 미세조정 바 (0-B 캘리브레이션) */
+.tuner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  z-index: 12;
+}
+
+.tuner__btn {
+  flex: 1;
+  padding: 10px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(17, 24, 39, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+}
+
+.tuner__val {
+  min-width: 92px;
+  text-align: center;
+  color: var(--fg);
+  background: rgba(17, 24, 39, 0.85);
+  border-radius: 8px;
+  padding: 10px 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}

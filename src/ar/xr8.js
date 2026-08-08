@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { createAlignmentBox } from './alignmentBox.js'
 import { Metrics, FpsMeter } from './metrics.js'
 import { createShaderSmokeTest } from './shaderSmokeTest.js'
-import { showBanner } from '../hud.js'
+import { showBanner, createSizeTuner } from '../hud.js'
 import { RUNTIME } from './runtime.js'
 
 // 8th Wall XR8 카메라 파이프라인 위에 three.js 씬을 얹고,
@@ -71,6 +71,10 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
   let maxDistCm = 0
   let reacquireCount = 0
   let everFound = false
+  // 정합 배율 k — 엔진 크기 규약이 후보 공식과 정확히 맞지 않아 실물에 맞춰 읽는다.
+  // 마지막 imagefound 값을 보관해 k 변경 시 즉시 다시 그린다.
+  let sizeK = 1
+  let lastDetail = null
   const box = createAlignmentBox()
   const metrics = new Metrics(30)
   const fps = new FpsMeter()
@@ -85,10 +89,10 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
     // 미터가 아닐 수 있어(0-B 실측), 규약을 눈으로 확인한 뒤 환산한다.
     const wMm = widthMmByName.get(name)
     const sForCal = typeof scale === 'number' && scale > 0 ? scale : 1
-    if (wMm && scaledWidth) metersPerUnit = wMm / 1000 / (scaledWidth * sForCal)
+    if (wMm && scaledWidth) metersPerUnit = wMm / 1000 / (scaledWidth * sForCal * sizeK)
     rawInfo =
       `raw sw=${fmt(scaledWidth)} sh=${fmt(scaledHeight)} scale=${fmt(scale)}` +
-      ` pos=(${fmt(position?.x)},${fmt(position?.y)},${fmt(position?.z)})` +
+      ` k=${sizeK.toFixed(3)}` +
       (metersPerUnit ? ` · 1u=${(metersPerUnit * 100).toFixed(1)}cm` : '')
     box.position.copy(position)
     box.quaternion.copy(rotation)
@@ -97,10 +101,11 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
     // scaledWidth/Height는 정규화 치수(높이=1)이고 scale이 실제 배율이다.
     if (scaledWidth && scaledHeight) {
       const s = typeof scale === 'number' && scale > 0 ? scale : 1
-      lastWidth = scaledWidth * s
-      lastHeight = scaledHeight * s
+      lastWidth = scaledWidth * s * sizeK
+      lastHeight = scaledHeight * s * sizeK
       box.resize(lastWidth, lastHeight)
     }
+    lastDetail = detail
     box.visible = true
   }
 
@@ -204,10 +209,17 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
   if (hasRealTarget) {
     // image-target-cli 산출 JSON을 그대로 주입한다 (README 확인).
     XR8.XrController.configure({ imageTargetData: imageTargets })
+    // 정합 배율 튜너: 박스가 실물 테두리와 정확히 겹칠 때까지 k를 맞춘 뒤
+    // 그 k 값을 알려주면 크기 공식을 확정한다.
+    createSizeTuner({
+      onChange: (k) => {
+        sizeK = k
+        if (lastDetail) attachBox(lastDetail)
+      },
+    })
     showBanner(
-      `<b>0-B 실측</b> — ${[...targetNames].join(', ')}<br>` +
-        `스케일 규약 확정(scale 적용). 뒤로 물러나며 <b>최대인식</b> 거리를,` +
-        ` 가려다 다시 비추며 <b>재획득</b> 횟수를 기록하세요.`
+      `<b>0-B 정합 배율 맞추기</b> — ±버튼으로 초록 박스를 실물 테두리에 정확히 맞추고,` +
+        ` 화면의 <b>k 값</b>을 알려주세요.`
     )
   } else {
     // 타겟 없이 카메라만: HUD에 0-A 상태 표시
