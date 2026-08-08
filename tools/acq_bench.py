@@ -10,6 +10,9 @@ correspondence(homography)를 복원할 정보가 충분한가?**
 
 세 축을 함께 본다:
   E0  full-resolution에서 homography가 복원되는가            → 정보가 존재하는가
+      판정은 두 단계: **발견(느슨)** / **정밀(엄격)**
+      아키텍처상 1.5m에는 발견만 필요하다("저 패널이 저기 있다").
+      정밀 정합은 0.9m에서 Image Target이 담당하므로 여기서 요구하지 않는다.
   E1  같은 사진을 1280/960/640/480으로 낮추며 반복           → 해상도가 병목인가
   E2  ORB / AKAZE / SIFT / BRISK 비교                        → 알고리즘 민감도
 
@@ -33,10 +36,18 @@ import numpy as np
 # 질의 이미지를 이 긴 변 길이로 줄여가며 반복 (E1 resolution sweep)
 SWEEP = [None, 1920, 1280, 960, 640, 480]
 
-# 판정 임계 — 넉넉하지만 "우연한 매칭"은 걸러내는 수준
-MIN_INLIERS = 15
-MIN_INLIER_RATIO = 0.15
-MAX_REPROJ_ERR = 5.0  # px (질의 이미지 기준)
+# 판정을 두 단계로 나눈다 (아키텍처 단순화 반영).
+#
+#   DISCOVERY — 1.5m에서 필요한 전부: "저 패널이 저기 있다 + 대략의 사각형".
+#     정밀 정합은 0.9m에서 Image Target이 담당하므로 여기서 요구하지 않는다.
+#     화면상 cue(glow/윤곽)를 얹을 정도면 충분 → 느슨한 기준.
+#
+#   PRECISION — homography로 단어 단위 정합까지 직접 하려는 경우의 기준.
+#     (Lightweight 경로를 택할 때만 필요)
+TIERS = {
+    "DISCOVERY": dict(min_inliers=8, min_ratio=0.10, max_err=15.0),
+    "PRECISION": dict(min_inliers=15, min_ratio=0.15, max_err=5.0),
+}
 
 
 def build_detectors():
@@ -132,18 +143,19 @@ def match_and_homography(ref_gray, qry_gray, det, norm):
     return res
 
 
-def judge(res, qry_shape):
+def judge(res, qry_shape, tier):
+    t = TIERS[tier]
     if res["quad"] is None:
         return False, res["note"] or "실패"
     ok_shape, shape_note = quad_is_sane(res["quad"], qry_shape)
     if not ok_shape:
         return False, shape_note
-    if res["inliers"] < MIN_INLIERS:
-        return False, f"inlier {res['inliers']} < {MIN_INLIERS}"
-    if res["inlier_ratio"] < MIN_INLIER_RATIO:
-        return False, f"inlier비 {res['inlier_ratio']:.2f} < {MIN_INLIER_RATIO}"
-    if res["reproj_err"] is not None and res["reproj_err"] > MAX_REPROJ_ERR:
-        return False, f"재투영오차 {res['reproj_err']:.1f}px"
+    if res["inliers"] < t["min_inliers"]:
+        return False, f"inlier {res['inliers']}"
+    if res["inlier_ratio"] < t["min_ratio"]:
+        return False, f"inlier비 {res['inlier_ratio']:.2f}"
+    if res["reproj_err"] is not None and res["reproj_err"] > t["max_err"]:
+        return False, f"오차 {res['reproj_err']:.1f}px"
     return True, shape_note
 
 
@@ -171,14 +183,16 @@ def run(ref_path, query_paths, out_dir):
                 continue  # 원본보다 큰 스윕 단계는 의미 없음
             for name, det, norm in dets:
                 r = match_and_homography(ref, qg, det, norm)
-                ok, note = judge(r, qg.shape)
+                ok_disc, note_d = judge(r, qg.shape, "DISCOVERY")
+                ok, note = judge(r, qg.shape, "PRECISION")
                 err_s = "  -  " if r["reproj_err"] is None else f"{r['reproj_err']:5.1f}"
                 print(
                     f"  {label:>5}px  {name:<6} "
                     f"kp {r['ref_kp']:>5}/{r['qry_kp']:>5}  good {r['good']:>4}  "
                     f"inlier {r['inliers']:>4} ({r['inlier_ratio']:.2f})  "
                     f"err {err_s}px  "
-                    f"{'PASS' if ok else 'fail'}  {note}"
+                    f"발견 {'PASS' if ok_disc else 'fail'} / 정밀 {'PASS' if ok else 'fail'}  "
+                    f"{note if not ok else note_d}"
                 )
                 report.append(
                     {
@@ -191,12 +205,13 @@ def run(ref_path, query_paths, out_dir):
                         "inliers": r["inliers"],
                         "inlier_ratio": round(r["inlier_ratio"], 3),
                         "reproj_err": None if r["reproj_err"] is None else round(r["reproj_err"], 2),
-                        "pass": ok,
+                        "pass_discovery": ok_disc,
+                        "pass_precision": ok,
                         "note": note,
                     }
                 )
                 # PASS면 복원 사각형을 그려 저장 (육안 확인용)
-                if ok:
+                if ok_disc:
                     vis = q.copy()
                     cv2.polylines(vis, [np.int32(r["quad"])], True, (0, 230, 120), 3, cv2.LINE_AA)
                     cv2.imwrite(
