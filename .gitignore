@@ -18,5 +18,6 @@ public/targets/*
 !public/targets/manifest.json
 !public/targets/*.json
 !public/targets/*_luminance.png
+!public/targets/*_luminance.jpg
 # 0-B 테스트 타겟 원본: 사용자가 사이트에서 열어 인쇄/표시할 수 있어야 하므로 포함
 !public/targets/target0b.png
