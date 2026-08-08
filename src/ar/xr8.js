@@ -2,7 +2,8 @@ import * as THREE from 'three'
 import { createAlignmentBox } from './alignmentBox.js'
 import { Metrics, FpsMeter } from './metrics.js'
 import { createShaderSmokeTest } from './shaderSmokeTest.js'
-import { showBanner, createSizeTuner } from '../hud.js'
+import { showBanner } from '../hud.js'
+import { createWordProbes } from './wordProbes.js'
 import { RUNTIME } from './runtime.js'
 
 // 8th Wall XR8 카메라 파이프라인 위에 three.js 씬을 얹고,
@@ -46,6 +47,11 @@ export async function loadImageTargets(base = import.meta.env.BASE_URL || '/') {
         const file = String(data.imagePath || '').split('/').pop()
         data.imagePath = `${dir}/${file}`
         if (!data.name) data.name = name
+        // 0-D 단어 probe 좌표(선택): <name>_words.json 이 있으면 함께 싣는다.
+        try {
+          const wr = await fetch(`${dir}/${name}_words.json`, { cache: 'no-cache' })
+          if (wr.ok) data.words = (await wr.json()).words || []
+        } catch {}
         return data
       })
     )
@@ -71,11 +77,10 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
   let maxDistCm = 0
   let reacquireCount = 0
   let everFound = false
-  // 정합 배율 k — 엔진 크기 규약이 후보 공식과 정확히 맞지 않아 실물에 맞춰 읽는다.
-  // 마지막 imagefound 값을 보관해 k 변경 시 즉시 다시 그린다.
-  let sizeK = 1
-  let lastDetail = null
   const box = createAlignmentBox()
+  // 0-D 단어 정합 probe (타겟에 <name>_words.json 이 있을 때만)
+  const wordsByName = new Map(imageTargets.filter((t) => t.words?.length).map((t) => [t.name, t.words]))
+  let probes = null
   const metrics = new Metrics(30)
   const fps = new FpsMeter()
 
@@ -89,23 +94,30 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
     // 미터가 아닐 수 있어(0-B 실측), 규약을 눈으로 확인한 뒤 환산한다.
     const wMm = widthMmByName.get(name)
     const sForCal = typeof scale === 'number' && scale > 0 ? scale : 1
-    if (wMm && scaledWidth) metersPerUnit = wMm / 1000 / (scaledWidth * sForCal * sizeK)
+    if (wMm && scaledWidth) metersPerUnit = wMm / 1000 / (scaledWidth * sForCal)
     rawInfo =
       `raw sw=${fmt(scaledWidth)} sh=${fmt(scaledHeight)} scale=${fmt(scale)}` +
-      ` k=${sizeK.toFixed(3)}` +
+
       (metersPerUnit ? ` · 1u=${(metersPerUnit * 100).toFixed(1)}cm` : '')
     box.position.copy(position)
     box.quaternion.copy(rotation)
-    // 스케일 규약 (0-B 실측으로 확정, 스펙 §6.3 정정):
-    // 실제 타겟 크기 = scaledWidth·scale × scaledHeight·scale.
-    // scaledWidth/Height는 정규화 치수(높이=1)이고 scale이 실제 배율이다.
+    // 스케일 규약 — 0-B 실측으로 확정(k=1.000에서 인쇄 테두리와 일치):
+    //   실제 타겟 크기 = scaledWidth·scale × scaledHeight·scale
+    // scaledWidth/Height는 높이=1로 정규화된 치수이고 scale이 실제 배율이다.
+    // (스펙 §6.3의 "scale 제외" 서술을 실측으로 정정)
     if (scaledWidth && scaledHeight) {
       const s = typeof scale === 'number' && scale > 0 ? scale : 1
-      lastWidth = scaledWidth * s * sizeK
-      lastHeight = scaledHeight * s * sizeK
+      lastWidth = scaledWidth * s
+      lastHeight = scaledHeight * s
       box.resize(lastWidth, lastHeight)
+      // 단어 probe를 현재 타겟 크기에 맞춰 배치
+      const list = wordsByName.get(name)
+      if (list && !probes) {
+        probes = createWordProbes(list)
+        box.add(probes)
+      }
+      if (probes) probes.layout(lastWidth, lastHeight)
     }
-    lastDetail = detail
     box.visible = true
   }
 
@@ -209,17 +221,10 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
   if (hasRealTarget) {
     // image-target-cli 산출 JSON을 그대로 주입한다 (README 확인).
     XR8.XrController.configure({ imageTargetData: imageTargets })
-    // 정합 배율 튜너: 박스가 실물 테두리와 정확히 겹칠 때까지 k를 맞춘 뒤
-    // 그 k 값을 알려주면 크기 공식을 확정한다.
-    createSizeTuner({
-      onChange: (k) => {
-        sizeK = k
-        if (lastDetail) attachBox(lastDetail)
-      },
-    })
     showBanner(
-      `<b>0-B 정합 배율 맞추기</b> — ±버튼으로 초록 박스를 실물 테두리에 정확히 맞추고,` +
-        ` 화면의 <b>k 값</b>을 알려주세요.`
+      `<b>0-D 단어 정합</b> — 초록=추적 영역, ` +
+        `<span style="color:#60a5fa">파랑</span>=단어 probe(생각·중·실측).<br>` +
+        `각 단어 위에서 probe가 얼마나 어긋나는지 보세요. 글자 높이 ≈16mm.`
     )
   } else {
     // 타겟 없이 카메라만: HUD에 0-A 상태 표시
