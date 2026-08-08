@@ -1,6 +1,6 @@
 {
   "targets": [
     { "name": "target0b", "widthMm": 210 },
-    { "name": "poster" }
+    { "name": "poster", "widthMm": 420 }
   ]
 }
