@@ -39,10 +39,15 @@ export async function loadImageTargets(base = import.meta.env.BASE_URL || '/') {
         // widthMm(실물 가로 폭)이 있으면 world scale calibration(스펙 §6.2)에 쓴다.
         const name = typeof entry === 'string' ? entry : entry.name
         const widthMm = typeof entry === 'object' ? entry.widthMm : undefined
+        // 종이(인쇄물) 실치수 — 있으면 외곽선을 별도로 그린다
+        const paperWidthMm = typeof entry === 'object' ? entry.paperWidthMm : undefined
+        const paperHeightMm = typeof entry === 'object' ? entry.paperHeightMm : undefined
         const r = await fetch(`${dir}/${name}.json`, { cache: 'no-cache' })
         if (!r.ok) throw new Error(`타겟 로드 실패: ${name}`)
         const data = await r.json()
         if (widthMm) data.widthMm = widthMm
+        if (paperWidthMm) data.paperWidthMm = paperWidthMm
+        if (paperHeightMm) data.paperHeightMm = paperHeightMm
         // imagePath는 CLI 기본값이 'image-targets/..'이므로 실제 서빙 경로로 교정한다.
         const file = String(data.imagePath || '').split('/').pop()
         data.imagePath = `${dir}/${file}`
@@ -81,6 +86,16 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
   // (실측: 가까이서 획득 후 물러나면 훨씬 멀리까지 유지됨 → 서비스상 중요한 값은 획득 거리)
   let bestAcquireCm = 0
   const box = createAlignmentBox()
+  // 종이 외곽선 — 추적 영역(3:4)과 달리 인쇄물 실제 외곽을 그린다.
+  // 추적 영역은 엔진 제약으로 3:4 고정이지만, 박스는 우리가 그리는 것이므로
+  // 종이 실치수(mm)를 알면 외곽선을 정확히 재현할 수 있다.
+  const paperBox = createAlignmentBox({ color: 0xfbbf24, cornerColor: 0xfbbf24, withAxes: false })
+  paperBox.visible = false
+  const paperByName = new Map(
+    imageTargets
+      .filter((t) => t.paperWidthMm && t.paperHeightMm)
+      .map((t) => [t.name, { w: t.paperWidthMm, h: t.paperHeightMm }])
+  )
   // 0-D 단어 정합 probe (타겟에 <name>_words.json 이 있을 때만)
   const wordsByName = new Map(imageTargets.filter((t) => t.words?.length).map((t) => [t.name, t.words]))
   let probes = null
@@ -120,6 +135,16 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
         box.add(probes)
       }
       if (probes) probes.layout(lastWidth, lastHeight)
+
+      // 종이 외곽선: 실치수(mm)를 엔진 단위로 환산해 그린다.
+      // 추적 영역이 종이 중앙에 놓인다는 전제(두 타겟 모두 중앙 크롭).
+      const paper = paperByName.get(name)
+      if (paper && metersPerUnit) {
+        paperBox.position.copy(position)
+        paperBox.quaternion.copy(rotation)
+        paperBox.resize(paper.w / 1000 / metersPerUnit, paper.h / 1000 / metersPerUnit)
+        paperBox.visible = true
+      }
     }
     box.visible = true
   }
@@ -129,6 +154,7 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
     onStart: () => {
       const { scene } = XR8.Threejs.xrScene()
       scene.add(box)
+      scene.add(paperBox)
     },
     // 매 프레임: 계측값 갱신
     onUpdate: () => {
@@ -184,6 +210,7 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
         process: ({ detail }) => {
           if (!targetNames.has(detail.name)) return
           box.visible = false
+          paperBox.visible = false
           metrics.reset()
           hud.setFound(false)
         },
@@ -233,8 +260,10 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
     // image-target-cli 산출 JSON을 그대로 주입한다 (README 확인).
     XR8.XrController.configure({ imageTargetData: imageTargets })
     showBanner(
-      `<b>0-B/0-D 실측</b> — <span style="color:#60a5fa">파랑</span>=단어 probe.<br>` +
-        `<b>획득거리</b>=처음 잡히는 거리(뒤에서 다가오며), <b>유지최대</b>=잡힌 뒤 버티는 거리.`
+      `<b>0-B/0-D 실측</b> — <span style="color:#34d399">초록</span>=추적영역(3:4), ` +
+        `<span style="color:#fbbf24">노랑</span>=종이 외곽(실치수), ` +
+        `<span style="color:#60a5fa">파랑</span>=단어 probe.<br>` +
+        `<b>획득거리</b>=처음 잡히는 거리(멀리서 다가오며), <b>유지최대</b>=잡힌 뒤 버티는 거리.`
     )
   } else {
     // 타겟 없이 카메라만: HUD에 0-A 상태 표시

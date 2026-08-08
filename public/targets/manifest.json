@@ -1,6 +1,16 @@
 {
   "targets": [
-    { "name": "target0b", "widthMm": 180 },
-    { "name": "poster", "widthMm": 420 }
+    {
+      "name": "target0b",
+      "widthMm": 180,
+      "paperWidthMm": 210,
+      "paperHeightMm": 297
+    },
+    {
+      "name": "poster",
+      "widthMm": 420,
+      "paperWidthMm": 420,
+      "paperHeightMm": 594
+    }
   ]
 }
