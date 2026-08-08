@@ -260,7 +260,8 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
     // image-target-cli 산출 JSON을 그대로 주입한다 (README 확인).
     XR8.XrController.configure({ imageTargetData: imageTargets })
     showBanner(
-      `<b>0-B/0-D 실측</b> — <span style="color:#34d399">초록</span>=추적영역(3:4), ` +
+      `<b>${RUNTIME.disableWorldTracking ? '타겟 단독' : 'SLAM 켜짐(0-B2)'}</b> · ` +
+        `<span style="color:#34d399">초록</span>=추적영역(3:4), ` +
         `<span style="color:#fbbf24">노랑</span>=종이 외곽(실치수), ` +
         `<span style="color:#60a5fa">파랑</span>=단어 probe.<br>` +
         `<b>획득거리</b>=처음 잡히는 거리(멀리서 다가오며), <b>유지최대</b>=잡힌 뒤 버티는 거리.`

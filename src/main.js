@@ -60,6 +60,12 @@ loadRuntime(RUNTIME).then(
       // 컴파일된 이미지 타겟이 있으면 로드(없으면 빈 배열 → 카메라만)
       const imageTargets = await loadImageTargets()
 
+      // ?slam — 0-B2 게이트: world tracking(SLAM)을 켜서 접근 중 연속성을 비교한다.
+      // 기본값은 이미지 타겟 단독(끔). 켜면 패널이 프레임을 벗어나거나 폰을 기울여도
+      // 공간 관계가 유지되는지 확인할 수 있다. 획득 거리 자체는 바뀌지 않을 것으로 예상
+      // (획득은 여전히 이미지 타겟 몫) — 그 예상이 맞는지도 함께 본다.
+      if (q.has('slam')) RUNTIME.disableWorldTracking = false
+
       // ?a3 — target0b를 A3로 인쇄했을 때 실치수를 보정한다.
       // 같은 타겟 이미지라 엔진은 인쇄 크기를 알 수 없으므로 여기서 알려줘야
       // 거리·Pose 변동이 올바른 mm로 나온다. (A4→A3: 선형 ×√2)
