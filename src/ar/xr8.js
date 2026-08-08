@@ -67,7 +67,12 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
   // 엔진 1단위 = 몇 m 인가. imagefound에서 scaledWidth와 실물 폭을 비교해 정한다.
   let metersPerUnit = null
   let rawInfo = 'raw –'
+  // 스케일 규약 판정용 두 후보를 동시에 그린다(0-B 실측).
+  //   초록  A안: 크기 = scaledWidth × scaledHeight        (scale 미적용)
+  //   자홍  B안: 크기 = scaledWidth·scale × scaledHeight·scale
+  // 인쇄 테두리에 겹치는 쪽이 올바른 규약 → 확정 후 나머지는 제거한다.
   const box = createAlignmentBox()
+  const boxB = createAlignmentBox({ color: 0xff4dd2, cornerColor: 0xff4dd2, withAxes: false })
   const metrics = new Metrics(30)
   const fps = new FpsMeter()
 
@@ -96,8 +101,13 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
       lastWidth = scaledWidth
       lastHeight = scaledHeight
       box.resize(scaledWidth, scaledHeight)
+      const s = typeof scale === 'number' && scale > 0 ? scale : 1
+      boxB.resize(scaledWidth * s, scaledHeight * s)
     }
+    boxB.position.copy(position)
+    boxB.quaternion.copy(rotation)
     box.visible = true
+    boxB.visible = true
   }
 
   const imageTargetModule = () => ({
@@ -105,6 +115,7 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
     onStart: () => {
       const { scene } = XR8.Threejs.xrScene()
       scene.add(box)
+      scene.add(boxB)
     },
     // 매 프레임: 계측값 갱신
     onUpdate: () => {
@@ -144,6 +155,7 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
         process: ({ detail }) => {
           if (!targetNames.has(detail.name)) return
           box.visible = false
+          boxB.visible = false
           metrics.reset()
           hud.setFound(false)
         },
@@ -193,8 +205,10 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
     // image-target-cli 산출 JSON을 그대로 주입한다 (README 확인).
     XR8.XrController.configure({ imageTargetData: imageTargets })
     showBanner(
-      `<b>0-B 타겟 등록</b> — ${[...targetNames].join(', ')}<br>` +
-        `포스터를 비추면 정합 박스가 표시됩니다.`
+      `<b>0-B 스케일 판정</b> — ${[...targetNames].join(', ')}<br>` +
+        `<span style="color:#34d399">초록</span>=scale 미적용 / ` +
+        `<span style="color:#ff4dd2">자홍</span>=scale 적용.<br>` +
+        `인쇄 테두리에 <b>겹치는 쪽</b>을 알려주세요.`
     )
   } else {
     // 타겟 없이 카메라만: HUD에 0-A 상태 표시

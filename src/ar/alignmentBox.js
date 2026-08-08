@@ -8,14 +8,14 @@ import * as THREE from 'three'
 //   - 타겟 실측 크기에 맞춘 와이어프레임 사각 테두리 (패널 테두리와 겹쳐 봐야 함)
 //   - 중앙 축 헬퍼 (X빨강/Y초록/Z파랑, 회전·기울기 정합 확인)
 //   - 네 모서리 점 (근접 시 코너 어긋남을 집어내기 쉽게)
-export function createAlignmentBox() {
+export function createAlignmentBox({ color = 0x34d399, cornerColor = 0xfbbf24, withAxes = true } = {}) {
   const group = new THREE.Group()
   group.name = 'alignment-box'
 
   // 1) 사각 테두리 (초기 1×1, imagefound에서 실측 크기로 resize)
   const border = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.PlaneGeometry(1, 1)),
-    new THREE.LineBasicMaterial({ color: 0x34d399 })
+    new THREE.LineBasicMaterial({ color })
   )
   border.name = 'border'
   group.add(border)
@@ -23,11 +23,12 @@ export function createAlignmentBox() {
   // 2) 축 헬퍼 (기본 길이, resize에서 스케일)
   const axes = new THREE.AxesHelper(0.5)
   axes.name = 'axes'
+  axes.visible = withAxes
   group.add(axes)
 
   // 3) 모서리 점
   const cornerGeo = new THREE.SphereGeometry(0.01, 12, 12)
-  const cornerMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24 })
+  const cornerMat = new THREE.MeshBasicMaterial({ color: cornerColor })
   const corners = new THREE.Group()
   corners.name = 'corners'
   for (let i = 0; i < 4; i++) corners.add(new THREE.Mesh(cornerGeo, cornerMat))
