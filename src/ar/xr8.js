@@ -67,12 +67,11 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
   // 엔진 1단위 = 몇 m 인가. imagefound에서 scaledWidth와 실물 폭을 비교해 정한다.
   let metersPerUnit = null
   let rawInfo = 'raw –'
-  // 스케일 규약 판정용 두 후보를 동시에 그린다(0-B 실측).
-  //   초록  A안: 크기 = scaledWidth × scaledHeight        (scale 미적용)
-  //   자홍  B안: 크기 = scaledWidth·scale × scaledHeight·scale
-  // 인쇄 테두리에 겹치는 쪽이 올바른 규약 → 확정 후 나머지는 제거한다.
+  // 0-B 측정 누적값: 인식 성공 최대 거리(peak hold), 재획득 횟수
+  let maxDistCm = 0
+  let reacquireCount = 0
+  let everFound = false
   const box = createAlignmentBox()
-  const boxB = createAlignmentBox({ color: 0xff4dd2, cornerColor: 0xff4dd2, withAxes: false })
   const metrics = new Metrics(30)
   const fps = new FpsMeter()
 
@@ -85,29 +84,24 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
     // 엔진 원시값을 화면에 노출한다. disableWorldTracking 모드에서는 좌표가
     // 미터가 아닐 수 있어(0-B 실측), 규약을 눈으로 확인한 뒤 환산한다.
     const wMm = widthMmByName.get(name)
-    if (wMm && scaledWidth) metersPerUnit = wMm / 1000 / scaledWidth
+    const sForCal = typeof scale === 'number' && scale > 0 ? scale : 1
+    if (wMm && scaledWidth) metersPerUnit = wMm / 1000 / (scaledWidth * sForCal)
     rawInfo =
       `raw sw=${fmt(scaledWidth)} sh=${fmt(scaledHeight)} scale=${fmt(scale)}` +
       ` pos=(${fmt(position?.x)},${fmt(position?.y)},${fmt(position?.z)})` +
       (metersPerUnit ? ` · 1u=${(metersPerUnit * 100).toFixed(1)}cm` : '')
     box.position.copy(position)
     box.quaternion.copy(rotation)
-    // 주의(스펙 §6.3): detail에는 scale과 scaledWidth/Height가 함께 온다.
-    // scaledWidth/Height가 이미 scale이 반영된 실측 크기이므로, box.scale까지
-    // 따로 걸면 이중 적용이 된다. 여기서는 크기의 단일 출처로 scaledWidth/Height만
-    // 쓴다(geometry를 실측 크기로 resize). 실 런타임 연결 시 줄자로 검증해
-    // 규약이 다르면 이 지점만 조정한다.
+    // 스케일 규약 (0-B 실측으로 확정, 스펙 §6.3 정정):
+    // 실제 타겟 크기 = scaledWidth·scale × scaledHeight·scale.
+    // scaledWidth/Height는 정규화 치수(높이=1)이고 scale이 실제 배율이다.
     if (scaledWidth && scaledHeight) {
-      lastWidth = scaledWidth
-      lastHeight = scaledHeight
-      box.resize(scaledWidth, scaledHeight)
       const s = typeof scale === 'number' && scale > 0 ? scale : 1
-      boxB.resize(scaledWidth * s, scaledHeight * s)
+      lastWidth = scaledWidth * s
+      lastHeight = scaledHeight * s
+      box.resize(lastWidth, lastHeight)
     }
-    boxB.position.copy(position)
-    boxB.quaternion.copy(rotation)
     box.visible = true
-    boxB.visible = true
   }
 
   const imageTargetModule = () => ({
@@ -115,7 +109,6 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
     onStart: () => {
       const { scene } = XR8.Threejs.xrScene()
       scene.add(box)
-      scene.add(boxB)
     },
     // 매 프레임: 계측값 갱신
     onUpdate: () => {
@@ -129,6 +122,12 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
           m.distanceCm *= metersPerUnit
           m.poseVarMm *= metersPerUnit
         }
+        // 인식에 성공한 상태에서의 최대 거리를 계속 갱신한다
+        // (= 이 거리까지는 인식이 유지된다는 실측 기록)
+        if (m.distanceCm > maxDistCm) {
+          maxDistCm = m.distanceCm
+          hud.setMaxDistance(maxDistCm)
+        }
         hud.setMetrics(m)
         hud.setDebug(rawInfo)
       }
@@ -138,6 +137,8 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
         event: 'reality.imagefound',
         process: ({ detail }) => {
           if (!targetNames.has(detail.name)) return
+          if (everFound) hud.setReacquire(++reacquireCount)
+          everFound = true
           metrics.reset()
           attachBox(detail)
           hud.setFound(true)
@@ -155,7 +156,6 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
         process: ({ detail }) => {
           if (!targetNames.has(detail.name)) return
           box.visible = false
-          boxB.visible = false
           metrics.reset()
           hud.setFound(false)
         },
@@ -205,10 +205,9 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
     // image-target-cli 산출 JSON을 그대로 주입한다 (README 확인).
     XR8.XrController.configure({ imageTargetData: imageTargets })
     showBanner(
-      `<b>0-B 스케일 판정</b> — ${[...targetNames].join(', ')}<br>` +
-        `<span style="color:#34d399">초록</span>=scale 미적용 / ` +
-        `<span style="color:#ff4dd2">자홍</span>=scale 적용.<br>` +
-        `인쇄 테두리에 <b>겹치는 쪽</b>을 알려주세요.`
+      `<b>0-B 실측</b> — ${[...targetNames].join(', ')}<br>` +
+        `스케일 규약 확정(scale 적용). 뒤로 물러나며 <b>최대인식</b> 거리를,` +
+        ` 가려다 다시 비추며 <b>재획득</b> 횟수를 기록하세요.`
     )
   } else {
     // 타겟 없이 카메라만: HUD에 0-A 상태 표시

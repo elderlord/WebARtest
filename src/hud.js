@@ -18,6 +18,8 @@ export function createHud() {
       <span class="hud__metric">기울기 <b id="hud-tilt">–</b></span>
       <span class="hud__metric">Pose 변동 <b id="hud-jitter">–</b></span>
       <span class="hud__metric">FPS <b id="hud-fps">–</b></span>
+      <span class="hud__metric">최대인식 <b id="hud-maxdist">–</b></span>
+      <span class="hud__metric">재획득 <b id="hud-reacq">0</b></span>
     </div>
     <div class="hud__row hud__debug" id="hud-debug">raw –</div>
   `
@@ -31,6 +33,8 @@ export function createHud() {
     jitter: root.querySelector('#hud-jitter'),
     fps: root.querySelector('#hud-fps'),
     debug: root.querySelector('#hud-debug'),
+    maxdist: root.querySelector('#hud-maxdist'),
+    reacq: root.querySelector('#hud-reacq'),
   }
 
   return {
@@ -54,6 +58,13 @@ export function createHud() {
     // 엔진 원시값 표시 — 좌표/스케일 규약을 눈으로 확정하기 위한 진단용
     setDebug(text) {
       el.debug.textContent = text
+    },
+    // 0-B 측정: 인식에 성공한 최대 거리(peak hold)와 재획득 횟수
+    setMaxDistance(cm) {
+      el.maxdist.textContent = cm > 0 ? `${cm.toFixed(0)} cm` : '–'
+    },
+    setReacquire(n) {
+      el.reacq.textContent = String(n)
     },
   }
 }
