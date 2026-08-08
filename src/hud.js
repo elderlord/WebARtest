@@ -40,6 +40,18 @@ export function createHud() {
   }
 
   return {
+    // state: 'found' | 'lost' | 'hold'
+    //   hold = 타겟은 놓쳤지만 SLAM world pose로 유지 중 (0-B2 handoff)
+    setTracking(state) {
+      const found = state === 'found'
+      el.dot.classList.toggle('hud__dot--found', found || state === 'hold')
+      el.state.textContent =
+        state === 'found'
+          ? '타겟 인식됨 · 정합 박스 표시'
+          : state === 'hold'
+            ? '타겟 놓침 · SLAM으로 위치 유지 중 (handoff)'
+            : '타겟 탐색 중…'
+    },
     setFound(found) {
       el.dot.classList.toggle('hud__dot--found', found)
       el.state.textContent = found ? '타겟 인식됨 · 정합 박스 표시' : '타겟 탐색 중…'

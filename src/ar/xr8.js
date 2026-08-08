@@ -85,6 +85,10 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
   // 획득 거리: imagefound 시점의 거리. 유지 거리와 구분해서 재야 한다
   // (실측: 가까이서 획득 후 물러나면 훨씬 멀리까지 유지됨 → 서비스상 중요한 값은 획득 거리)
   let bestAcquireCm = 0
+  // 0-B2 handoff 모드: world tracking이 켜져 있으면 타겟을 놓쳐도 마지막 world pose로
+  // 유지한다. world tracking이 꺼져 있으면 좌표가 카메라 기준이라 유지가 무의미하므로
+  // 기존대로 숨긴다. ("SLAM 켜기"만으로는 A/B가 성립하지 않는다 — handoff가 본체)
+  const handoff = !RUNTIME.disableWorldTracking
   const box = createAlignmentBox()
   // 종이 외곽선 — 추적 영역(3:4)과 달리 인쇄물 실제 외곽을 그린다.
   // 추적 영역은 엔진 제약으로 3:4 고정이지만, 박스는 우리가 그리는 것이므로
@@ -187,7 +191,7 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
           everFound = true
           metrics.reset()
           attachBox(detail)
-          hud.setFound(true)
+          hud.setTracking('found')
           // 이 시점의 거리 = 초기 획득 거리
           try {
             const { camera } = XR8.Threejs.xrScene()
@@ -209,6 +213,12 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
         event: 'reality.imagelost',
         process: ({ detail }) => {
           if (!targetNames.has(detail.name)) return
+          if (handoff) {
+            // handoff: 마지막 world pose 그대로 두고 계속 표시.
+            // SLAM이 카메라를 계속 추적하므로 콘텐츠가 공간에 남는다.
+            hud.setTracking('hold')
+            return
+          }
           box.visible = false
           paperBox.visible = false
           metrics.reset()
@@ -260,7 +270,7 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = 
     // image-target-cli 산출 JSON을 그대로 주입한다 (README 확인).
     XR8.XrController.configure({ imageTargetData: imageTargets })
     showBanner(
-      `<b>${RUNTIME.disableWorldTracking ? '타겟 단독' : 'SLAM 켜짐(0-B2)'}</b> · ` +
+      `<b>${handoff ? '0-B2 handoff (타겟→SLAM)' : '타겟 단독'}</b> · ` +
         `<span style="color:#34d399">초록</span>=추적영역(3:4), ` +
         `<span style="color:#fbbf24">노랑</span>=종이 외곽(실치수), ` +
         `<span style="color:#60a5fa">파랑</span>=단어 probe.<br>` +
