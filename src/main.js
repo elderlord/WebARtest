@@ -55,9 +55,24 @@ loadRuntime(RUNTIME).then(
     if (RUNTIME.requiresAttribution) showAttribution()
     try {
       const { startXr8, loadImageTargets } = await import('./ar/xr8.js')
-      const shaderSmokeTest = new URLSearchParams(location.search).has('smoke')
+      const q = new URLSearchParams(location.search)
+      const shaderSmokeTest = q.has('smoke')
       // 컴파일된 이미지 타겟이 있으면 로드(없으면 빈 배열 → 카메라만)
       const imageTargets = await loadImageTargets()
+
+      // ?a3 — target0b를 A3로 인쇄했을 때 실치수를 보정한다.
+      // 같은 타겟 이미지라 엔진은 인쇄 크기를 알 수 없으므로 여기서 알려줘야
+      // 거리·Pose 변동이 올바른 mm로 나온다. (A4→A3: 선형 ×√2)
+      if (q.has('a3')) {
+        const K = Math.SQRT2
+        for (const t of imageTargets) {
+          if (t.name !== 'target0b') continue
+          t.widthMm = Math.round(180 * K * 10) / 10 // 254.6
+          t.paperWidthMm = 297
+          t.paperHeightMm = 420
+        }
+      }
+
       startXr8({ canvas, hud, shaderSmokeTest, imageTargets })
     } catch (err) {
       // 런타임은 있으나 파이프라인 시작 실패 → DEV로 위장하지 말고 실제 원인 표시
