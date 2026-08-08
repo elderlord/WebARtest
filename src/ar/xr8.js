@@ -9,20 +9,51 @@ import { RUNTIME } from './runtime.js'
 // 이미지 타겟 인식 시 정합 박스를 타겟에 부착한다. (0단계 계측 하네스)
 //
 // 전제:
-//   - window.XR8 런타임이 로드되어 있어야 한다 (self-host, /public/xr8/ 참고)
-//   - IMAGE_TARGET_NAME이 컴파일된 타겟의 이름과 일치해야 한다
-//     (사진이 없는 현재는 플레이스홀더. image-target-cli로 컴파일 후 교체)
+//   - window.XR8 런타임이 로드되어 있어야 한다 (CDN 또는 self-host, public/xr8 참고)
+//   - 이미지 타겟은 image-target-cli로 컴파일해 public/targets/에 배치하고
+//     manifest.json에 이름을 등록하면 런타임에 자동 로드된다.
 //
-// 참고 API: XR8.XrController.configure({ imageTargets }), reality.imagefound/updated/lost,
-//           XR8.Threejs.pipelineModule(), XR8.Threejs.xrScene()
+// 참고 API (0-A 실측 + image-target-cli README 확인):
+//   XR8.XrController.configure({ imageTargetData: [<컴파일된 target json>] })
+//   reality.imagefound/imageupdated/imagelost, XR8.Threejs.pipelineModule()/xrScene()
 
-// TODO(사진 확보 후): 컴파일된 이미지 타겟 이름으로 교체.
-export const IMAGE_TARGET_NAME = 'panel-placeholder'
+// 타겟 매니페스트: 빌드에 타겟이 없어도 앱이 동작해야 하므로 런타임에 fetch한다.
+// public/targets/manifest.json 예: { "targets": ["poster"] }
+// 각 타겟은 public/targets/<name>.json (+ <name>_luminance.png)로 배치한다.
+const TARGETS_DIR = 'targets'
+
+// 컴파일된 타겟들을 로드한다. 없으면 빈 배열(0-A 모드: 카메라만).
+export async function loadImageTargets(base = import.meta.env.BASE_URL || '/') {
+  const dir = `${base}${TARGETS_DIR}`
+  try {
+    const res = await fetch(`${dir}/manifest.json`, { cache: 'no-cache' })
+    if (!res.ok) return []
+    const { targets = [] } = await res.json()
+    const loaded = await Promise.all(
+      targets.map(async (name) => {
+        const r = await fetch(`${dir}/${name}.json`, { cache: 'no-cache' })
+        if (!r.ok) throw new Error(`타겟 로드 실패: ${name}`)
+        const data = await r.json()
+        // imagePath는 CLI 기본값이 'image-targets/..'이므로 실제 서빙 경로로 교정한다.
+        const file = String(data.imagePath || '').split('/').pop()
+        data.imagePath = `${dir}/${file}`
+        if (!data.name) data.name = name
+        return data
+      })
+    )
+    return loaded
+  } catch (e) {
+    console.warn('[webar] 이미지 타겟 없음/로드 실패 → 카메라만 실행:', e)
+    return []
+  }
+}
 
 // opts.shaderSmokeTest: true면 0-A 셰이더 스모크 테스트 모듈을 파이프라인에 추가한다.
 //   (?smoke 쿼리로 켜는 것을 권장 — 아래 startXr8 호출부에서 판단)
-export function startXr8({ canvas, hud, shaderSmokeTest = false } = {}) {
+export function startXr8({ canvas, hud, shaderSmokeTest = false, imageTargets = [] } = {}) {
   const XR8 = window.XR8
+  // 인식 대상 이름 집합 (여러 패널 확장 대비). 비어 있으면 카메라만(0-A 모드).
+  const targetNames = new Set(imageTargets.map((t) => t.name).filter(Boolean))
   const box = createAlignmentBox()
   const metrics = new Metrics(30)
   const fps = new FpsMeter()
@@ -68,7 +99,7 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false } = {}) {
       {
         event: 'reality.imagefound',
         process: ({ detail }) => {
-          if (detail.name !== IMAGE_TARGET_NAME) return
+          if (!targetNames.has(detail.name)) return
           metrics.reset()
           attachBox(detail)
           hud.setFound(true)
@@ -77,14 +108,14 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false } = {}) {
       {
         event: 'reality.imageupdated',
         process: ({ detail }) => {
-          if (detail.name !== IMAGE_TARGET_NAME) return
+          if (!targetNames.has(detail.name)) return
           attachBox(detail)
         },
       },
       {
         event: 'reality.imagelost',
         process: ({ detail }) => {
-          if (detail.name !== IMAGE_TARGET_NAME) return
+          if (!targetNames.has(detail.name)) return
           box.visible = false
           metrics.reset()
           hud.setFound(false)
@@ -110,9 +141,9 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false } = {}) {
     XR8.XrController.pipelineModule(), // 트래킹 (SLAM은 조건부: runtime.enableWorldTracking)
   ]
 
-  // 이미지 타겟은 실제 컴파일 타겟이 있을 때만 등록한다.
-  // 0-A(사진 없음, placeholder)에서는 타겟 없이 카메라+HUD만 띄운다.
-  const hasRealTarget = IMAGE_TARGET_NAME && IMAGE_TARGET_NAME !== 'panel-placeholder'
+  // 이미지 타겟은 컴파일된 타겟이 실제로 로드됐을 때만 등록한다.
+  // 타겟이 없으면(0-A) 카메라+HUD만 띄운다.
+  const hasRealTarget = targetNames.size > 0
   if (hasRealTarget) modules.push(imageTargetModule())
 
   // 0-A 셰이더 스모크 테스트 (?smoke): 카메라 텍스처 셰이더 접근 판정
@@ -132,7 +163,12 @@ export function startXr8({ canvas, hud, shaderSmokeTest = false } = {}) {
   XR8.XrController.configure({ disableWorldTracking: RUNTIME.disableWorldTracking })
 
   if (hasRealTarget) {
-    XR8.XrController.configure({ imageTargets: [IMAGE_TARGET_NAME] })
+    // image-target-cli 산출 JSON을 그대로 주입한다 (README 확인).
+    XR8.XrController.configure({ imageTargetData: imageTargets })
+    showBanner(
+      `<b>0-B 타겟 등록</b> — ${[...targetNames].join(', ')}<br>` +
+        `포스터를 비추면 정합 박스가 표시됩니다.`
+    )
   } else {
     // 타겟 없이 카메라만: HUD에 0-A 상태 표시
     hud.setFound(false)

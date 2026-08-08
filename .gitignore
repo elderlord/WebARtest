@@ -11,5 +11,10 @@ node_modules/.vite-plugin-basic-ssl/
 # XR Engine License: 원형 배포만 허용 + 공개 저장소 재배포 회색지대 → 커밋하지 않음
 public/xr8/*
 !public/xr8/README.md
+# 이미지 타겟: 런타임에 필요한 것(매니페스트·메타데이터·luminance)만 커밋한다.
+# 원본/크롭/썸네일은 용량이 크고 트래킹에 불필요하므로 제외.
 public/targets/*
 !public/targets/README.md
+!public/targets/manifest.json
+!public/targets/*.json
+!public/targets/*_luminance.png

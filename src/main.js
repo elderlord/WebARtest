@@ -54,9 +54,11 @@ loadRuntime(RUNTIME).then(
     // 런타임 로드 성공 (window.XR8 준비됨)
     if (RUNTIME.requiresAttribution) showAttribution()
     try {
-      const { startXr8 } = await import('./ar/xr8.js')
+      const { startXr8, loadImageTargets } = await import('./ar/xr8.js')
       const shaderSmokeTest = new URLSearchParams(location.search).has('smoke')
-      startXr8({ canvas, hud, shaderSmokeTest })
+      // 컴파일된 이미지 타겟이 있으면 로드(없으면 빈 배열 → 카메라만)
+      const imageTargets = await loadImageTargets()
+      startXr8({ canvas, hud, shaderSmokeTest, imageTargets })
     } catch (err) {
       // 런타임은 있으나 파이프라인 시작 실패 → DEV로 위장하지 말고 실제 원인 표시
       console.error('[webar] startXr8 실패:', err)
